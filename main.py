@@ -1,6 +1,6 @@
 from app import create_app
 from app.utils.database import engine
-from app.models.lesson import Base
+from app.models import Base
 
 app = create_app()
 

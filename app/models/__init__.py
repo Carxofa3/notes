@@ -1,3 +1,1 @@
-from .lesson import Lesson, Base
-from .unit import Unit
-from .note import Note
+from .models import Lesson, Unit, Note, Base

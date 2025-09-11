@@ -11,20 +11,20 @@ def get_notes():
     if not unit_id:
         return error_response('Missing unit_id parameter', 400)
     notes = note_service.get_notes_by_unit(unit_id)
-    return success_response([note.__dict__ for note in notes])
+    return success_response(notes)
 
 @notes_blueprint.route('/notes', methods=['POST'])
 @validate_json(['title', 'content', 'lesson_id'])
 def create_note(data):
     note = note_service.create_note(data['title'], data['content'], data['lesson_id'], data.get('unit_id'))
-    return success_response(note.__dict__, 201)
+    return success_response(note, 201)
 
 @notes_blueprint.route('/notes/<int:note_id>', methods=['PUT'])
 @validate_json([])
 def update_note(data, note_id):
     note = note_service.update_note(note_id, data)
     if note:
-        return success_response(note.__dict__)
+        return success_response(note)
     return error_response('Note not found', 404)
 
 @notes_blueprint.route('/notes/<int:note_id>', methods=['DELETE'])

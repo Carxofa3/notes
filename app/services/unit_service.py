@@ -1,32 +1,26 @@
-from app.utils.database import get_db
-from app.models.unit import Unit
+from app.database import db
+from app.models import Unit
 
 def get_units_by_lesson(lesson_id):
-    db = next(get_db())
-    return db.query(Unit).filter(Unit.lesson_id == lesson_id).all()
+    return db.session.query(Unit).filter(Unit.lesson_id == lesson_id).all()
 
 def create_unit(title, lesson_id):
-    db = next(get_db())
     unit = Unit(title=title, lesson_id=lesson_id)
-    db.add(unit)
-    db.commit()
-    db.refresh(unit)
+    db.session.add(unit)
+    db.session.commit()
     return unit
 
 def update_unit(unit_id, data):
-    db = next(get_db())
-    unit = db.query(Unit).filter(Unit.id == unit_id).first()
+    unit = db.session.query(Unit).filter(Unit.id == unit_id).first()
     if unit:
         for key, value in data.items():
             setattr(unit, key, value)
-        db.commit()
-        db.refresh(unit)
+        db.session.commit()
     return unit
 
 def delete_unit(unit_id):
-    db = next(get_db())
-    unit = db.query(Unit).filter(Unit.id == unit_id).first()
+    unit = db.session.query(Unit).filter(Unit.id == unit_id).first()
     if unit:
-        db.delete(unit)
-        db.commit()
+        db.session.delete(unit)
+        db.session.commit()
     return unit
