@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduNote - Classroom Notetaking</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Base styles for CSS variables */
+        :root {
+            /* Light Theme */
+            --color-text-primary: #1a202c;
+            --color-background-primary: #f7fafe;
+            --color-accent: #4299e1;
+            --color-accent-light: #ebf8ff;
+            
+            --color-border-subtle: rgba(26, 32, 44, 0.1);
+            --color-background-secondary: #ffffff;
+            --color-text-muted: #718096;
+            --color-text-inverted: #ffffff;
+        }
+        
+        .dark {
+            /* Dark Theme */
+            --color-text-primary: #e2e8f0;
+            --color-background-primary: #1a202c;
+            --color-accent: #63b3ed;
+            --color-accent-light: #1a2430;
+            
+            --color-border-subtle: rgba(226, 232, 240, 0.1);
+            --color-background-secondary: #2d3748;
+            --color-text-muted: #a0aec0;
+        }
+        
+        body {
+            background-color: var(--color-background-primary);
+            color: var(--color-text-primary);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+    </style>
+    <script>
+        tailwind.config = {
+          darkMode: 'class',
+          theme: {
+            extend: {
+              colors: {
+                'primary': 'var(--color-text-primary)',
+                'background': 'var(--color-background-primary)',
+                'accent': 'var(--color-accent)',
+                'accent-light': 'var(--color-accent-light)',
+                'border-subtle': 'var(--color-border-subtle)',
+                'background-secondary': 'var(--color-background-secondary)',
+                'text-muted': 'var(--color-text-muted)',
+                'text-inverted': 'var(--color-text-inverted)'
+              }
+            }
+          }
+        }
+    </script>
+</head>
+<body class="min-h-screen flex font-sans">
+    <!-- Sidebar for lessons and units -->
+    <aside class="w-64 border-r border-border-subtle bg-background-secondary h-full overflow-y-auto fixed left-0 top-0">
+        <div class="p-5 border-b border-border-subtle">
+            <h1 class="text-xl font-bold flex items-center gap-2">
+                <i class="fas fa-book-open text-accent"></i>
+                EduNote
+            </h1>
+            <p class="text-xs text-text-muted mt-1">Classroom Notetaking App</p>
+        </div>
+        
+        <!-- Theme switcher -->
+        <div class="px-4 py-3 bg-background-secondary border-b border-border-subtle">
+            <button id="theme-toggle" class="flex items-center gap-2 w-full text-left p-2 rounded-lg hover:bg-accent-light transition-colors">
+                <i class="fas fa-moon dark:hidden"></i>
+                <i class="fas fa-sun hidden dark:block"></i>
+                <span>Dark Mode</span>
+            </button>
+        </div>
+        
+        <!-- Lessons (folders) -->
+        <div class="px-3 py-2">
+            <div class="flex justify-between items-center">
+                <h2 class="text-xs uppercase text-text-muted tracking-wider font-semibold">Lessons</h2>
+                <button id="new-lesson-btn" class="text-text-muted hover:text-accent transition-colors">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+            <ul id="lessons-list" class="mt-1 space-y-1">
+                <!-- Lesson items will be dynamically added here -->
+            </ul>
+        </div>
+        
+        <!-- Units within a lesson -->
+        <div class="px-3 py-4 mt-6 bg-background-secondary border-t border-border-subtle rounded-lg mx-2">
+            <div class="flex justify-between items-center">
+                <h2 class="text-xs uppercase text-text-muted tracking-wider font-semibold">Units</h2>
+                <button id="new-unit-btn" class="text-text-muted hover:text-accent transition-colors">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+            <ul id="units-list" class="mt-1 space-y-1">
+                <!-- Unit items will be dynamically added here -->
+            </ul>
+        </div>
+    </aside>
+
+    <!-- Main content area -->
+    <main class="flex-1 ml-64 p-5 overflow-y-auto">
+        <!-- Header with actions -->
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h2 class="text-xl font-bold" id="current-unit-title">Algebra Basics</h2>
+                <p class="text-sm text-text-muted" id="current-note-count">3 notes in this unit</p>
+            </div>
+            <button id="new-note-btn" class="flex items-center gap-2 px-4 py-2 bg-accent text-background-secondary rounded-lg font-medium hover:bg-opacity-90 transition-colors">
+                <i class="fas fa-plus"></i> New Note
+            </button>
+        </div>
+        
+        <!-- Notes list -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5" id="notes-container">
+            <!-- Note cards will be dynamically added here -->
+        </div>
+    </main>
+
+    <!-- Add/Edit Note Modal -->
+    <div id="note-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-background-secondary rounded-xl w-full max-w-md mx-auto border border-border-subtle overflow-hidden">
+            <div class="p-4 border-b border-border-subtle flex justify-between items-center">
+                <h3 class="font-medium" id="modal-title">New Note</h3>
+                <button id="close-modal" class="text-text-muted hover:text-accent transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-4">
+                <textarea id="note-content" class="w-full h-64 p-3 bg-transparent border-b border-border-subtle focus:outline-none focus:border-accent transition-colors resize-none" placeholder="Start typing your note here..."></textarea>
+                <div class="mt-4 flex justify-end gap-2">
+                    <button id="cancel-btn" class="px-4 py-2 text-text-muted hover:text-accent transition-colors">Cancel</button>
+                    <button id="save-note" class="px-4 py-2 bg-accent text-background-secondary rounded-lg font-medium hover:bg-opacity-90 transition-colors">Save Note</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add New Unit Modal -->
+    <div id="unit-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-background-secondary rounded-xl w-full max-w-md mx-auto border border-border-subtle overflow-hidden">
+            <div class="p-4 border-b border-border-subtle flex justify-between items-center">
+                <h3 class="font-medium" id="unit-modal-title">New Unit</h3>
+                <button id="close-unit-modal" class="text-text-muted hover:text-accent transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-4">
+                <input type="text" id="unit-name" class="w-full p-3 bg-transparent border-b border-border-subtle focus:outline-none focus:border-accent transition-colors" placeholder="Unit name" required>
+                <div class="mt-4 flex justify-end gap-2">
+                    <button id="cancel-unit-btn" class="px-4 py-2 text-text-muted hover:text-accent transition-colors">Cancel</button>
+                    <button id="save-unit" class="px-4 py-2 bg-accent text-background-secondary rounded-lg font-medium hover:bg-opacity-90 transition-colors">Create Unit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add New Lesson Modal -->
+    <div id="lesson-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-background-secondary rounded-xl w-full max-w-md mx-auto border border-border-subtle overflow-hidden">
+            <div class="p-4 border-b border-border-subtle flex justify-between items-center">
+                <h3 class="font-medium" id="lesson-modal-title">New Lesson</h3>
+                <button id="close-lesson-modal" class="text-text-muted hover:text-accent transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-4">
+                <input type="text" id="lesson-name" class="w-full p-3 bg-transparent border-b border-border-subtle focus:outline-none focus:border-accent transition-colors" placeholder="Lesson title" required>
+                <div class="mt-4 flex justify-end gap-2">
+                    <button id="cancel-lesson-btn" class="px-4 py-2 text-text-muted hover:text-accent transition-colors">Cancel</button>
+                    <button id="save-lesson" class="px-4 py-2 bg-accent text-background-secondary rounded-lg font-medium hover:bg-opacity-90 transition-colors">Create Lesson</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Sample data structure
+        const appData = {
+            lessons: [
+                {
+                    id: 1,
+                    title: "Introduction to Algebra",
+                    units: [
+                        { id: 1, title: "Variables and Expressions", notes: [1,2] },
+                        { id: 2, title: "Order of Operations", notes: [3] }
+                    ]
+                },
+                {
+                    id: 2,
+                    title: "Linear Equations",
+                    units: [
+                        { id: 1, title: "Solving One-Step Equations", notes: [4,5] },
+                        { id: 2, title: "Multi-step Equations", notes: [6] }
+                    ]
+                },
+                {
+                    id: 3,
+                    title: "Functions and Graphs",
+                    units: [
+                        { id: 1, title: "Function Basics", notes: [7] },
+                        { id: 2, title: "Slope and Intercepts", notes: [8,9] }
+                    ]
+                }
+            ],
+            notes: [
+                { id: 1, lessonId: 1, unitId: 1, title: "What is a variable?", content: "A variable is a symbol that represents a quantity that can change or vary.", color: "bg-blue-100 text-blue-800" },
+                { id: 2, lessonId: 1, unitId: 1, title: "Combining like terms", content: "Like terms are terms that have the same variable raised to the same power. You can combine them by adding or subtracting coefficients.", color: "bg-blue-100 text-blue-800" },
+                // ... more notes
+            ]
+        };
+
+        // DOM Elements
+        const lessonsList = document.getElementById('lessons-list');
+        const unitsList = document.getElementById('units-list');
+        const notesContainer = document.getElementById('notes-container');
+        const noteModal = document.getElementById('note-modal');
+        const unitModal = document.getElementById('unit-modal');
+        const lessonModal = document.getElementById('lesson-modal');
+        const themeToggle = document.getElementById('theme-toggle');
+        const newNoteBtn = document.getElementById('new-note-btn');
+        const newLessonBtn = document.getElementById('new-lesson-btn');
+        const newUnitBtn = document.getElementById('new-unit-btn');
+        const closeModal = document.getElementById('close-modal');
+        const cancelBtn = document.getElementById('cancel-btn');
+        const saveNoteBtn = document.getElementById('save-note');
+        const unitModalTitle = document.getElementById('unit-modal-title');
+        const lessonModalTitle = document.getElementById('lesson-modal-title');
+        const closeUnitModal = document.getElementById('close-unit-modal');
+        const cancelUnitBtn = document.getElementById('cancel-unit-btn');
+        const saveUnitBtn = document.getElementById('save-unit');
+        const closeLessonModal = document.getElementById('close-lesson-modal');
+        const cancelLessonBtn = document.getElementById('cancel-lesson-btn');
+        const saveLessonBtn = document.getElementById('save-lesson');
+
+        // Current state
+        let currentLessonId = 1;
+        let currentUnitId = 1;
+        let currentNoteId = null;
+
+        // Initialize the app
+        function initApp() {
+            renderLessons();
+            renderUnits();
+            renderNotes();
+        }
+
+        // Render lessons list
+        function renderLessons() {
+            lessonsList.innerHTML = '';
+            
+            appData.lessons.forEach(lesson => {
+                const lessonItem = document.createElement('li');
+                lessonItem.className = 'sidebar-item flex items-center gap-3 py-2 px-3 rounded-lg cursor-pointer transition-colors hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)]';
+                
+                // Set active class if this is the current lesson
+                if (currentLessonId === lesson.id) {
+                    lessonItem.classList.add('bg-accent-light', 'font-medium');
+                }
+                
+                lessonItem.innerHTML = `
+                    <i class="fas fa-folder text-text-muted"></i>
+                    <span>${lesson.title}</span>
+                `;
+                
+                lessonItem.addEventListener('click', () => {
+                    currentLessonId = lesson.id;
+                    renderUnits();
+                });
+                
+                lessonsList.appendChild(lessonItem);
+            });
+        }
+
+ // Render units list
+ function renderUnits() {
+    unitsList.innerHTML = '';
+    
+    const currentLesson = appData.lessons.find(lesson => lesson.id === currentLessonId);
+    
+    if (!currentLesson) return;
+    
+    currentLesson.units.forEach(unit => {
+        const unitItem = document.createElement('li');
+        unitItem.className = 'sidebar-item flex items-center gap-3 py-2 px-3 rounded-lg cursor-pointer transition-colors hover:bg-[var(--color-accent-light)] hover:text-[var(--color-accent)]';
+
+        // Set active class if this is the current unit
+        if (currentUnitId === unit.id) {
+            unitItem.classList.add('bg-accent-light', 'font-medium');
+        }
+
+        unitItem.innerHTML = `
+            <i class="fas fa-book text-text-muted"></i>
+            <span>${unit.title}</span>
+        `;
+        
+        unitItem.addEventListener('click', () => {
+            currentUnitId = unit.id;
+            renderNotes();
+            updateCurrentUnitTitle();
+        });
+        
+        unitsList.appendChild(unitItem);
+    });
+}
+
+// Open new note modal
+function openNoteModal() {
+    noteModal.classList.remove('hidden');
+    currentNoteId = null;
+    document.getElementById('modal-title').textContent = 'New Note';
+    document.getElementById('note-content').value = '';
+}
+
+// Render notes for the current unit and lesson
+function renderNotes() {
+    notesContainer.innerHTML = '';
+    
+    const currentLesson = appData.lessons.find(lesson => lesson.id === currentLessonId);
+    if (!currentLesson) return;
+    
+    const currentUnit = currentLesson.units.find(unit => unit.id === currentUnitId);
+    if (!currentUnit) return;
+    
+    // Update the current unit title and note count
+    updateCurrentUnitTitle();
+    
+    // Filter notes for the current unit
+    const unitNotes = appData.notes.filter(note => note.lessonId === currentLessonId && note.unitId === currentUnitId);
+    
+    // For each note in the current unit and lesson
+    unitNotes.forEach(note => {
+        // For each note, render a card
+        const noteCard = document.createElement('div');
+        noteCard.className = 'note-card bg-background-secondary border border-border-subtle rounded-xl p-4 overflow-hidden cursor-pointer transition-colors hover:scale-[1.02] hover:shadow-lg';
+        
+        // Note content
+        noteCard.innerHTML = `
+            <div class="flex items-start gap-3">
+                <span class="text-sm font-bold ${note.color}">${note.title}</span>
+            </div>
+            <p class="mt-2 text-text-muted">${note.content}</p>
+        `;
+        
+        // Add click event to edit note
+        noteCard.addEventListener('click', () => {
+            openEditNoteModal(note);
+        });
+        
+        notesContainer.appendChild(noteCard);
+    });
+}
+
+// Open edit note modal
+function openEditNoteModal(note) {
+    noteModal.classList.remove('hidden');
+    currentNoteId = note.id;
+    document.getElementById('modal-title').textContent = 'Edit Note';
+    document.getElementById('note-content').value = note.content;
+}
+
+// Update current unit title and note count
+function updateCurrentUnitTitle() {
+    const currentLesson = appData.lessons.find(lesson => lesson.id === currentLessonId);
+    if (!currentLesson) return;
+    
+    const currentUnit = currentLesson.units.find(unit => unit.id === currentUnitId);
+    if (!currentUnit) return;
+    
+    document.getElementById('current-unit-title').textContent = currentUnit.title;
+    
+    // Count notes for this unit
+    const unitNotes = appData.notes.filter(note => note.lessonId === currentLessonId && note.unitId === currentUnitId);
+    document.getElementById('current-note-count').textContent = `${unitNotes.length} note${unitNotes.length !== 1 ? 's' : ''} in this unit`;
+}
+
+// Open new unit modal
+function openUnitModal() {
+    unitModal.classList.remove('hidden');
+    document.getElementById('unit-name').value = '';
+    document.getElementById('unit-modal-title').textContent = 'New Unit';
+}
+
+// Open new lesson modal
+function openLessonModal() {
+    lessonModal.classList.remove('hidden');
+    document.getElementById('lesson-name').value = '';
+    document.getElementById('lesson-modal-title').textContent = 'New Lesson';
+}
+
+// Event listeners for note modal
+closeModal.addEventListener('click', () => {
+    noteModal.classList.add('hidden');
+});
+
+cancelBtn.addEventListener('click', () => {
+    noteModal.classList.add('hidden');
+});
+
+saveNoteBtn.addEventListener('click', () => {
+    const content = document.getElementById('note-content').value.trim();
+    if (content) {
+        if (currentNoteId === null) {
+            // Create new note
+            const newNote = {
+                id: appData.notes.length + 1,
+                lessonId: currentLessonId,
+                unitId: currentUnitId,
+                title: "Note " + (appData.notes.length + 1),
+                content: content,
+                color: "bg-blue-100 text-blue-800"
+            };
+            appData.notes.push(newNote);
+        } else {
+            // Update existing note
+            const note = appData.notes.find(n => n.id === currentNoteId);
+            if (note) {
+                note.content = content;
+            }
+        }
+        noteModal.classList.add('hidden');
+        renderNotes();
+    }
+});
+
+// Event listeners for unit modal
+closeUnitModal.addEventListener('click', () => {
+    unitModal.classList.add('hidden');
+});
+
+cancelUnitBtn.addEventListener('click', () => {
+    unitModal.classList.add('hidden');
+});
+
+saveUnitBtn.addEventListener('click', () => {
+    const unitName = document.getElementById('unit-name').value.trim();
+    if (unitName) {
+        const currentLesson = appData.lessons.find(lesson => lesson.id === currentLessonId);
+        if (currentLesson) {
+            const newUnit = {
+                id: currentLesson.units.length + 1,
+                title: unitName,
+                notes: []
+            };
+            currentLesson.units.push(newUnit);
+            unitModal.classList.add('hidden');
+            renderUnits();
+        }
+    }
+});
+
+// Event listeners for lesson modal
+closeLessonModal.addEventListener('click', () => {
+    lessonModal.classList.add('hidden');
+});
+
+cancelLessonBtn.addEventListener('click', () => {
+    lessonModal.classList.add('hidden');
+});
+
+saveLessonBtn.addEventListener('click', () => {
+    const lessonName = document.getElementById('lesson-name').value.trim();
+    if (lessonName) {
+        const newLesson = {
+            id: appData.lessons.length + 1,
+            title: lessonName,
+            units: []
+        };
+        appData.lessons.push(newLesson);
+        lessonModal.classList.add('hidden');
+        renderLessons();
+    }
+});
+
+// Theme toggle
+themeToggle.addEventListener('click', () => {
+    document.body.classList.toggle('dark');
+});
+
+// New note button
+newNoteBtn.addEventListener('click', openNoteModal);
+
+// New lesson button
+newLessonBtn.addEventListener('click', openLessonModal);
+
+// New unit button
+newUnitBtn.addEventListener('click', openUnitModal);
+
+// Initialize the app
+document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
