@@ -1,7 +1,7 @@
-# Response utilities
-# Contains functions for formatting API responses:
-# - success_response(data, message)
-# - error_response(error_message, status_code)
-# - paginated_response(data, page, per_page, total)
-# - format_datetime(datetime_obj)
+from flask import jsonify
 
+def success_response(data, status_code=200):
+    return jsonify(data), status_code
+
+def error_response(message, status_code=400):
+    return jsonify({'error': message}), status_code

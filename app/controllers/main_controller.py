@@ -1,6 +1,7 @@
-# Main/Home controller
-# Handles routes for the main application:
-# - GET / (home page, shows all lessons)
-# - Template rendering for main interface
-# - Basic navigation endpoints
+from flask import Blueprint, render_template
 
+main_blueprint = Blueprint('main', __name__)
+
+@main_blueprint.route('/')
+def index():
+    return render_template('main.html')
