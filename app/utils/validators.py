@@ -15,3 +15,14 @@ def validate_json(required_fields):
             return f(data=data, *args, **kwargs)
         return wrapper
     return decorator
+
+def validate_required_fields(data, required_fields):
+    """Validate that required fields are present in data dictionary"""
+    if not isinstance(data, dict):
+        return False, "Data must be a dictionary"
+    
+    missing_fields = [field for field in required_fields if field not in data or not data[field]]
+    if missing_fields:
+        return False, f"Missing required fields: {', '.join(missing_fields)}"
+    
+    return True, None

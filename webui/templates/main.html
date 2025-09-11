@@ -7,6 +7,17 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Rich Text Editor (Self-hosted) -->
+    <script src="{{ url_for('static', filename='js/tinymce/tinymce.min.js') }}"></script>
+    <!-- Color picker -->
+    <script src="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/pickr.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/themes/classic.min.css"/>
+    <!-- Icons -->
+    <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.js"></script>
+    <!-- Drag and Drop -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <!-- NumPy for JS (for vector calculations) -->
+    <script src="https://cdn.jsdelivr.net/npm/ml-matrix@6.10.4/lib/index.min.js"></script>
     <style>
         /* Base styles for CSS variables */
         :root {
@@ -71,12 +82,16 @@
             <p class="text-xs text-text-muted mt-1">Classroom Notetaking App</p>
         </div>
         
-        <!-- Theme switcher -->
+        <!-- Theme switcher and settings -->
         <div class="px-4 py-3 bg-background-secondary border-b border-border-subtle">
-            <button id="theme-toggle" class="flex items-center gap-2 w-full text-left p-2 rounded-lg hover:bg-accent-light transition-colors">
+            <button id="theme-toggle" class="flex items-center gap-2 w-full text-left p-2 rounded-lg hover:bg-accent-light transition-colors mb-2">
                 <i class="fas fa-moon dark:hidden"></i>
                 <i class="fas fa-sun hidden dark:block"></i>
                 <span>Dark Mode</span>
+            </button>
+            <button id="settings-btn" class="flex items-center gap-2 w-full text-left p-2 rounded-lg hover:bg-accent-light transition-colors">
+                <i class="fas fa-cog"></i>
+                <span>Settings</span>
             </button>
         </div>
         
@@ -84,11 +99,16 @@
         <div class="px-3 py-2">
             <div class="flex justify-between items-center">
                 <h2 class="text-xs uppercase text-text-muted tracking-wider font-semibold">Lessons</h2>
-                <button id="new-lesson-btn" class="text-text-muted hover:text-accent transition-colors">
-                    <i class="fas fa-plus"></i>
-                </button>
+                <div class="flex gap-1">
+                    <button id="toggle-lesson-edit" class="text-text-muted hover:text-accent transition-colors" title="Edit lessons">
+                        <i class="fas fa-pencil-alt"></i>
+                    </button>
+                    <button id="new-lesson-btn" class="text-text-muted hover:text-accent transition-colors" title="Add lesson">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
             </div>
-            <ul id="lessons-list" class="mt-1 space-y-1">
+            <ul id="lessons-list" class="mt-1 space-y-1 sortable-lessons">
                 <!-- Lesson items will be dynamically added here -->
             </ul>
         </div>
@@ -97,11 +117,16 @@
         <div class="px-3 py-4 mt-6 bg-background-secondary border-t border-border-subtle rounded-lg mx-2">
             <div class="flex justify-between items-center">
                 <h2 class="text-xs uppercase text-text-muted tracking-wider font-semibold">Units</h2>
-                <button id="new-unit-btn" class="text-text-muted hover:text-accent transition-colors">
-                    <i class="fas fa-plus"></i>
-                </button>
+                <div class="flex gap-1">
+                    <button id="toggle-unit-edit" class="text-text-muted hover:text-accent transition-colors" title="Edit units">
+                        <i class="fas fa-pencil-alt"></i>
+                    </button>
+                    <button id="new-unit-btn" class="text-text-muted hover:text-accent transition-colors" title="Add unit">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
             </div>
-            <ul id="units-list" class="mt-1 space-y-1">
+            <ul id="units-list" class="mt-1 space-y-1 sortable-units">
                 <!-- Unit items will be dynamically added here -->
             </ul>
         </div>
@@ -109,6 +134,22 @@
 
     <!-- Main content area -->
     <main class="flex-1 ml-64 p-5 overflow-y-auto">
+        <!-- Search Bar -->
+        <div class="mb-6">
+            <div class="relative">
+                <input type="text" id="search-input" class="w-full pl-10 pr-4 py-3 bg-background-secondary border border-border-subtle rounded-lg focus:outline-none focus:border-accent transition-colors" placeholder="Search notes with AI-powered semantic search..." autocomplete="off">
+                <div class="absolute left-3 top-3.5 text-text-muted">
+                    <i class="fas fa-search"></i>
+                </div>
+                <div id="search-results" class="absolute top-full left-0 right-0 mt-1 bg-background-secondary border border-border-subtle rounded-lg shadow-lg z-30 hidden max-h-96 overflow-y-auto">
+                    <!-- Search results will be populated here -->
+                </div>
+                <div id="search-loading" class="absolute right-3 top-3.5 text-accent hidden">
+                    <i class="fas fa-spinner fa-spin"></i>
+                </div>
+            </div>
+        </div>
+
         <!-- Header with actions -->
         <div class="flex justify-between items-center mb-6">
             <div>
@@ -145,8 +186,23 @@
         <div class="flex flex-col h-full">
             <!-- Editor Header -->
             <div class="border-b border-border-subtle p-4 flex justify-between items-center">
-                <h3 class="font-medium" id="editor-title">New Note</h3>
+                <div class="flex items-center gap-4">
+                    <h3 class="font-medium" id="editor-title">New Note</h3>
+                    <div class="text-sm text-text-muted" id="note-stats">0 words • 0 min read</div>
+                </div>
                 <div class="flex gap-2">
+                    <button id="attach-image-btn" class="px-3 py-1 bg-accent text-background-secondary rounded-lg hover:bg-opacity-90 transition-colors">
+                        <i class="fas fa-image mr-1"></i> Image
+                    </button>
+                    <button id="ai-format-btn" class="px-3 py-1 bg-purple-500 text-background-secondary rounded-lg hover:bg-opacity-90 transition-colors">
+                        <i class="fas fa-magic mr-1"></i> AI Format
+                    </button>
+                    <button id="delete-note-btn" class="px-3 py-1 bg-red-500 text-background-secondary rounded-lg hover:bg-opacity-90 transition-colors hidden">
+                        <i class="fas fa-trash mr-1"></i> Delete
+                    </button>
+                    <button id="save-note-btn" class="px-3 py-1 bg-green-500 text-background-secondary rounded-lg hover:bg-opacity-90 transition-colors">
+                        <i class="fas fa-save mr-1"></i> Save
+                    </button>
                     <button id="close-editor" class="px-3 py-1 text-text-muted hover:text-accent transition-colors">
                         <i class="fas fa-times"></i>
                     </button>
@@ -155,11 +211,35 @@
             
             <!-- Editor Content -->
             <div class="flex flex-1 overflow-hidden">
-                <!-- Markdown Preview (replacing text editor) -->
+                <!-- Rich Text Editor -->
                 <div class="flex-1 flex flex-col">
-                    <div id="editor-content" class="flex-1 p-4 overflow-y-auto prose dark:prose-invert"></div>
+                    <textarea id="editor-content" class="flex-1 resize-none border-0 outline-0"></textarea>
+                </div>
+                
+                <!-- Schema Sidebar -->
+                <div id="schema-sidebar" class="w-80 border-l border-border-subtle bg-background-secondary overflow-y-auto hidden">
+                    <div class="p-4">
+                        <h4 class="font-medium mb-3 flex items-center gap-2">
+                            <i class="fas fa-list-ul"></i> Document Outline
+                        </h4>
+                        <div id="schema-content">
+                            <div class="text-sm text-text-muted">Start typing to see document structure...</div>
+                        </div>
+                        
+                        <div class="mt-6">
+                            <h5 class="font-medium mb-2 text-sm">Attached Images</h5>
+                            <div id="attached-images" class="space-y-2">
+                                <div class="text-xs text-text-muted">No images attached</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
+            
+            <!-- Toggle Schema Button -->
+            <button id="toggle-schema" class="absolute right-4 top-16 bg-accent text-background-secondary rounded-full w-10 h-10 flex items-center justify-center hover:bg-opacity-90 transition-colors">
+                <i class="fas fa-list-ul"></i>
+            </button>
         </div>
     </div>
 
@@ -250,6 +330,305 @@
         </div>
     </div>
 
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-background-secondary rounded-xl w-full max-w-4xl mx-auto border border-border-subtle overflow-hidden max-h-[90vh] flex">
+            <!-- Settings Sidebar -->
+            <div class="w-64 border-r border-border-subtle bg-background-primary">
+                <div class="p-4 border-b border-border-subtle">
+                    <h3 class="font-medium">Settings</h3>
+                </div>
+                <nav class="p-2">
+                    <button class="settings-tab-btn w-full text-left px-3 py-2 rounded-lg hover:bg-accent-light transition-colors active" data-tab="appearance">
+                        <i class="fas fa-palette mr-2"></i> Appearance
+                    </button>
+                    <button class="settings-tab-btn w-full text-left px-3 py-2 rounded-lg hover:bg-accent-light transition-colors" data-tab="editor">
+                        <i class="fas fa-edit mr-2"></i> Editor
+                    </button>
+                    <button class="settings-tab-btn w-full text-left px-3 py-2 rounded-lg hover:bg-accent-light transition-colors" data-tab="content">
+                        <i class="fas fa-file-alt mr-2"></i> Content
+                    </button>
+                    <button class="settings-tab-btn w-full text-left px-3 py-2 rounded-lg hover:bg-accent-light transition-colors" data-tab="advanced">
+                        <i class="fas fa-cogs mr-2"></i> Advanced
+                    </button>
+                    <button class="settings-tab-btn w-full text-left px-3 py-2 rounded-lg hover:bg-accent-light transition-colors" data-tab="ai">
+                        <i class="fas fa-robot mr-2"></i> AI Features
+                    </button>
+                </nav>
+            </div>
+            
+            <!-- Settings Content -->
+            <div class="flex-1 flex flex-col max-h-[90vh]">
+                <div class="p-4 border-b border-border-subtle flex justify-between items-center">
+                    <h4 class="font-medium" id="settings-tab-title">Appearance Settings</h4>
+                    <button id="close-settings-modal" class="text-text-muted hover:text-accent transition-colors">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div class="flex-1 overflow-y-auto p-4">
+                    <!-- Appearance Tab -->
+                    <div id="appearance-tab" class="settings-tab-content">
+                        <div class="space-y-6">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Primary Color</label>
+                                <div class="flex items-center gap-4">
+                                    <div id="color-picker"></div>
+                                    <input type="text" id="color-input" placeholder="#4299e1" class="px-3 py-2 bg-transparent border border-border-subtle rounded-lg focus:outline-none focus:border-accent transition-colors">
+                                </div>
+                                <p class="text-xs text-text-muted mt-1">Choose a primary color to generate your theme palette</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-3">Generated Color Palette</label>
+                                <div id="color-palette" class="grid grid-cols-4 gap-2">
+                                    <!-- Color palette will be populated here -->
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="flex items-center gap-3">
+                                    <input type="checkbox" id="dark-mode-setting" class="w-5 h-5 text-accent rounded focus:ring-accent">
+                                    <span>Dark Mode</span>
+                                </label>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Custom CSS</label>
+                                <textarea id="custom-css" rows="6" class="w-full p-3 bg-transparent border border-border-subtle rounded-lg focus:outline-none focus:border-accent transition-colors" placeholder="/* Add your custom CSS here */"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Editor Tab -->
+                    <div id="editor-tab" class="settings-tab-content hidden">
+                        <div class="space-y-6">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Font Family</label>
+                                <select id="editor-font-family" class="w-full p-3 bg-transparent border border-border-subtle rounded-lg focus:outline-none focus:border-accent transition-colors">
+                                    <option value="Inter, system-ui, sans-serif">Inter (Default)</option>
+                                    <option value="'Times New Roman', serif">Times New Roman</option>
+                                    <option value="'Georgia', serif">Georgia</option>
+                                    <option value="'Arial', sans-serif">Arial</option>
+                                    <option value="'Monaco', monospace">Monaco (Code)</option>
+                                    <option value="'Fira Code', monospace">Fira Code</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Font Size: <span id="font-size-display">16px</span></label>
+                                <input type="range" id="editor-font-size" min="12" max="24" value="16" class="w-full">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Line Height</label>
+                                <select id="editor-line-height" class="w-full p-3 bg-transparent border border-border-subtle rounded-lg focus:outline-none focus:border-accent transition-colors">
+                                    <option value="1.4">Compact (1.4)</option>
+                                    <option value="1.6" selected>Normal (1.6)</option>
+                                    <option value="1.8">Relaxed (1.8)</option>
+                                    <option value="2.0">Spacious (2.0)</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Auto-save Interval: <span id="autosave-display">30 seconds</span></label>
+                                <input type="range" id="auto-save-interval" min="10" max="300" step="10" value="30" class="w-full">
+                            </div>
+                            
+                            <div>
+                                <label class="flex items-center gap-3">
+                                    <input type="checkbox" id="spell-check-setting" class="w-5 h-5 text-accent rounded focus:ring-accent" checked>
+                                    <span>Enable Spell Check</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Content Tab -->
+                    <div id="content-tab" class="settings-tab-content hidden">
+                        <div class="space-y-6">
+                            <div>
+                                <label class="flex items-center gap-3">
+                                    <input type="checkbox" id="auto-detect-titles" class="w-5 h-5 text-accent rounded focus:ring-accent" checked>
+                                    <span>Auto-detect Titles</span>
+                                </label>
+                                <p class="text-xs text-text-muted mt-1">Automatically suggest titles based on content</p>
+                            </div>
+                            
+                            <div>
+                                <label class="flex items-center gap-3">
+                                    <input type="checkbox" id="auto-generate-schema" class="w-5 h-5 text-accent rounded focus:ring-accent" checked>
+                                    <span>Auto-generate Document Schema</span>
+                                </label>
+                                <p class="text-xs text-text-muted mt-1">Show document outline in sidebar</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Default Note Color</label>
+                                <div id="note-color-picker"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Advanced Tab -->
+                    <div id="advanced-tab" class="settings-tab-content hidden">
+                        <div class="space-y-6">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Export Format</label>
+                                <select id="export-format" class="w-full p-3 bg-transparent border border-border-subtle rounded-lg focus:outline-none focus:border-accent transition-colors">
+                                    <option value="markdown" selected>Markdown</option>
+                                    <option value="html">HTML</option>
+                                    <option value="pdf">PDF</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Image Quality</label>
+                                <select id="image-quality" class="w-full p-3 bg-transparent border border-border-subtle rounded-lg focus:outline-none focus:border-accent transition-colors">
+                                    <option value="low">Low (Faster upload)</option>
+                                    <option value="medium" selected>Medium (Balanced)</option>
+                                    <option value="high">High (Best quality)</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Maximum Image Size: <span id="max-image-size-display">5 MB</span></label>
+                                <input type="range" id="max-image-size" min="1" max="20" value="5" class="w-full">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- AI Tab -->
+                    <div id="ai-tab" class="settings-tab-content hidden">
+                        <div class="space-y-6">
+                            <div>
+                                <label class="flex items-center gap-3">
+                                    <input type="checkbox" id="ai-enabled" class="w-5 h-5 text-accent rounded focus:ring-accent">
+                                    <span>Enable AI Features</span>
+                                </label>
+                                <p class="text-xs text-text-muted mt-1">Enable AI-powered formatting and semantic search</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">API Base URL</label>
+                                <input type="text" id="ai-base-url" class="w-full p-3 bg-transparent border border-border-subtle rounded-lg focus:outline-none focus:border-accent transition-colors" placeholder="https://api.openai.com/v1">
+                                <p class="text-xs text-text-muted mt-1">Base URL for OpenAI-compatible API</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">API Key</label>
+                                <div class="flex gap-2">
+                                    <input type="password" id="ai-api-key" class="flex-1 p-3 bg-transparent border border-border-subtle rounded-lg focus:outline-none focus:border-accent transition-colors" placeholder="sk-...">
+                                    <button id="test-ai-connection" class="px-3 py-2 bg-accent text-background-secondary rounded-lg hover:bg-opacity-90 transition-colors">
+                                        Test
+                                    </button>
+                                </div>
+                                <p class="text-xs text-text-muted mt-1">Your API key (stored securely)</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Chat Model</label>
+                                <select id="ai-model" class="w-full p-3 bg-transparent border border-border-subtle rounded-lg focus:outline-none focus:border-accent transition-colors">
+                                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                                    <option value="gpt-4">GPT-4</option>
+                                    <option value="gpt-4-turbo-preview">GPT-4 Turbo</option>
+                                </select>
+                                <p class="text-xs text-text-muted mt-1">Model used for text formatting</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Embedding Model</label>
+                                <select id="ai-embedding-model" class="w-full p-3 bg-transparent border border-border-subtle rounded-lg focus:outline-none focus:border-accent transition-colors">
+                                    <option value="text-embedding-ada-002">text-embedding-ada-002</option>
+                                    <option value="text-embedding-3-small">text-embedding-3-small</option>
+                                    <option value="text-embedding-3-large">text-embedding-3-large</option>
+                                </select>
+                                <p class="text-xs text-text-muted mt-1">Model used for semantic search</p>
+                            </div>
+                            
+                            <div>
+                                <label class="flex items-center gap-3">
+                                    <input type="checkbox" id="ai-auto-format" class="w-5 h-5 text-accent rounded focus:ring-accent">
+                                    <span>Auto-format new notes</span>
+                                </label>
+                                <p class="text-xs text-text-muted mt-1">Automatically format notes when saved</p>
+                            </div>
+                            
+                            <div>
+                                <label class="flex items-center gap-3">
+                                    <input type="checkbox" id="search-enabled" class="w-5 h-5 text-accent rounded focus:ring-accent" checked>
+                                    <span>Enable semantic search</span>
+                                </label>
+                                <p class="text-xs text-text-muted mt-1">Use AI embeddings for intelligent search</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Max Search Results: <span id="max-search-results-display">10</span></label>
+                                <input type="range" id="max-search-results" min="5" max="50" value="10" class="w-full">
+                            </div>
+                            
+                            <div class="border-t border-border-subtle pt-4">
+                                <div class="flex gap-2">
+                                    <button id="batch-embed-notes" class="px-4 py-2 bg-purple-500 text-background-secondary rounded-lg hover:bg-opacity-90 transition-colors">
+                                        <i class="fas fa-magic mr-2"></i>Generate Embeddings for All Notes
+                                    </button>
+                                </div>
+                                <p class="text-xs text-text-muted mt-1">Process existing notes for semantic search (this may take time)</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="p-4 border-t border-border-subtle flex justify-between">
+                    <button id="reset-settings" class="px-4 py-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900 rounded-lg transition-colors">
+                        Reset to Defaults
+                    </button>
+                    <div class="flex gap-2">
+                        <button id="cancel-settings" class="px-4 py-2 text-text-muted hover:text-accent transition-colors">Cancel</button>
+                        <button id="save-settings" class="px-4 py-2 bg-accent text-background-secondary rounded-lg font-medium hover:bg-opacity-90 transition-colors">Save Settings</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Upload Modal -->
+    <div id="image-upload-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-background-secondary rounded-xl w-full max-w-md mx-auto border border-border-subtle overflow-hidden">
+            <div class="p-4 border-b border-border-subtle flex justify-between items-center">
+                <h3 class="font-medium">Attach Image</h3>
+                <button id="close-image-upload-modal" class="text-text-muted hover:text-accent transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-4">
+                <div class="border-2 border-dashed border-border-subtle rounded-lg p-6 text-center" id="image-drop-zone">
+                    <i class="fas fa-cloud-upload-alt text-4xl text-text-muted mb-2"></i>
+                    <p class="text-text-muted mb-2">Drop image here or click to browse</p>
+                    <input type="file" id="image-file-input" accept="image/*" class="hidden">
+                    <button id="browse-image" class="px-4 py-2 bg-accent text-background-secondary rounded-lg hover:bg-opacity-90 transition-colors">
+                        Browse Files
+                    </button>
+                </div>
+                
+                <div id="image-preview" class="mt-4 hidden">
+                    <img id="preview-image" class="max-w-full max-h-48 rounded-lg mx-auto" alt="Preview">
+                    <div class="mt-2 text-sm text-text-muted text-center" id="image-info"></div>
+                </div>
+                
+                <div class="mt-4 flex justify-end gap-2">
+                    <button id="cancel-image-upload" class="px-4 py-2 text-text-muted hover:text-accent transition-colors">Cancel</button>
+                    <button id="upload-image" class="px-4 py-2 bg-accent text-background-secondary rounded-lg font-medium hover:bg-opacity-90 transition-colors" disabled>
+                        <span id="upload-text">Upload Image</span>
+                        <i id="upload-spinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/enhanced-app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/ai-enhanced-app.js') }}"></script>
     <script>
         // Sample data structure
         const appData = {
