@@ -10,11 +10,12 @@ def create_database():
     conn.close()
 
 def initialize_schema():
-    """Initializes the database schema by executing the schema.sql file."""
+    """Initializes the database schema by executing the unified migration file."""
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    schema_path = os.path.join(os.path.dirname(__file__), 'schema.sql')
+    # Use the new unified migration script
+    schema_path = os.path.join(os.path.dirname(__file__), 'V1_unified_migration.sql')
     with open(schema_path, 'r') as f:
         cursor.executescript(f.read())
 
@@ -35,7 +36,12 @@ def create_sample_data():
     conn.close()
 
 if __name__ == '__main__':
-    print("Initializing database...")
+    print("Initializing database with unified schema...")
+    # Remove existing database file to ensure a clean slate
+    if os.path.exists(db_path):
+        os.remove(db_path)
+        print(f"Removed existing database file: {db_path}")
+
     create_database()
     initialize_schema()
     # create_sample_data() # Uncomment to load sample data

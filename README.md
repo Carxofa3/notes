@@ -25,12 +25,34 @@ notes/
 
 ## Setup Instructions
 
-1. Create virtual environment: `python -m venv venv`
-2. Activate virtual environment: `venv\Scripts\activate` (Windows) or `source venv/bin/activate` (Linux/Mac)
-3. Install dependencies: `pip install -r requirements.txt`
-4. Copy `.env.example` to `.env` and configure settings
-5. Initialize database: `python database/init_db.py`
-6. Run application: `python main.py`
+1.  **Create and activate a virtual environment:**
+    ```bash
+    python -m venv venv
+    # On Windows
+    venv\\Scripts\\activate
+    # On macOS/Linux
+    source venv/bin/activate
+    ```
+
+2.  **Install dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+3.  **Configure your environment:**
+    - Copy `config/.env.example` to `config/.env`.
+    - Edit `config/.env` to add your API keys and other settings.
+
+4.  **Run the setup script:**
+    This will initialize the database with the complete schema and create necessary directories.
+    ```bash
+    python setup.py
+    ```
+
+5.  **Run the application:**
+    ```bash
+    python main.py
+    ```
 
 ## Architecture Overview
 
