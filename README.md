@@ -1,26 +1,22 @@
 # Notes App
 
-A web-based note-taking application for organizing lessons, units, and notes.
+A web-based note-taking application for organizing lessons, units, and notes, with AI-powered features.
 
 ## Project Structure
 
 ```
 notes/
 ├── app/                    # Main application package
-│   ├── controllers/        # Route handlers and API endpoints
-│   ├── models/            # Database models and schemas
-│   ├── services/          # Business logic layer
-│   └── utils/             # Utility functions and helpers
-├── config/                # Configuration files
-├── database/              # Database initialization and schema
-├── migrations/            # Database migration files
-├── tests/                 # Test files
-├── webui/                # Frontend templates and static files
-│   ├── templates/         # HTML templates
-│   └── static/           # CSS, JavaScript, images
-├── logs/                 # Application log files
-├── main.py               # Application entry point
-└── requirements.txt      # Python dependencies
+│   ├── api/                # Flask-RESTX API namespaces
+│   ├── models/             # SQLAlchemy database models
+│   ├── services/           # Business logic layer
+│   ├── static/             # Static files (CSS, JS, images)
+│   └── templates/          # HTML templates
+├── config/                 # Configuration files
+├── migrations/             # Database migration files
+├── tests/                  # Test files
+├── main.py                 # Application entry point
+└── requirements.txt        # Python dependencies
 ```
 
 ## Setup Instructions
@@ -41,12 +37,17 @@ notes/
 
 3.  **Configure your environment:**
     - Copy `config/.env.example` to `config/.env`.
-    - Edit `config/.env` to add your API keys and other settings.
+    - Edit `config/.env` to add your API keys and other settings (e.g., `OPENAI_API_KEY`).
 
-4.  **Run the setup script:**
-    This will initialize the database with the complete schema and create necessary directories.
+4.  **Initialize the database:**
+    This will create the database file and run all migrations.
     ```bash
-    python setup.py
+    # Set the FLASK_APP environment variable
+    # On Windows (cmd): set FLASK_APP=main.py
+    # On Windows (PowerShell): $env:FLASK_APP = "main.py"
+    # On macOS/Linux: export FLASK_APP=main.py
+
+    flask db upgrade
     ```
 
 5.  **Run the application:**
@@ -58,8 +59,7 @@ notes/
 
 The application follows a layered architecture:
 
-- **Models**: Define data structure and database relationships
-- **Services**: Contain business logic and data processing
-- **Controllers**: Handle HTTP requests and responses
-- **Utils**: Provide common functionality across the application
-
+- **Models**: Define data structure and database relationships using SQLAlchemy.
+- **Services**: Contain business logic and data processing.
+- **API**: Handles HTTP requests and responses using Flask-RESTX, with separate namespaces for each resource.
+- **Frontend**: A single-page application built with vanilla JavaScript that interacts with the backend API.
