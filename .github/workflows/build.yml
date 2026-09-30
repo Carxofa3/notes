@@ -136,8 +136,10 @@ jobs:
           BUILD_TOOLS_DIR=$(ls -d ${ANDROID_HOME}/build-tools/* | tail -n 1)
           echo "Using Android build-tools: $BUILD_TOOLS_DIR"
           
-          # Generate signing keystore
-          keytool -genkey -v -keystore release.keystore -alias notesworkstation -keyalg RSA -keysize 2048 -validity 10000 -storepass notes1234 -keypass notes1234 -dname "CN=NotesWorkstation, OU=Notes, O=Notes, L=Global, S=Global, C=US"
+          # Use checked-in permanent release keystore if present, otherwise generate
+          if [ ! -f release.keystore ]; then
+            keytool -genkey -v -keystore release.keystore -alias notesworkstation -keyalg RSA -keysize 2048 -validity 10000 -storepass notes1234 -keypass notes1234 -dname "CN=NotesWorkstation, OU=Notes, O=Notes, L=Global, S=Global, C=US"
+          fi
           
           # Locate unsigned APK
           UNSIGNED_APK=$(find src-tauri/gen/android/ -name "*universal-release-unsigned.apk" -o -name "*release-unsigned.apk" | head -n 1)
