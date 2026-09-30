@@ -15,7 +15,7 @@ note_model = ns.model('Note', {
 note_input_model = ns.model('NoteInput', {
     'title': fields.String(required=True, description='The note title'),
     'content': fields.String(description='The note content'),
-    'unit_id': fields.Integer(required=True, description='The unit identifier'),
+    'unit_id': fields.Integer(required=False, description='The unit identifier'),
 })
 
 note_update_model = ns.model('NoteUpdate', {
@@ -37,7 +37,9 @@ class NoteList(Resource):
     @ns.marshal_with(note_model, code=201)
     def post(self, unit_id):
         """Create a new note for a given unit"""
-        return note_service.create_note(unit_id, ns.payload), 201
+        payload = dict(ns.payload or {})
+        payload['unit_id'] = unit_id
+        return note_service.create_note(unit_id, payload), 201
 
 @ns.route('/<int:id>')
 @ns.response(404, 'Note not found')

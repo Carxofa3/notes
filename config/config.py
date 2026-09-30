@@ -7,10 +7,12 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'you-will-never-guess'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     JSON_SORT_KEYS = False
-    OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
-    OPENAI_API_BASE = os.environ.get('OPENAI_API_BASE')
-    CHAT_MODEL = os.environ.get('CHAT_MODEL') or 'gpt-3.5-turbo'
-    EMBEDDING_MODEL = os.environ.get('EMBEDDING_MODEL') or 'text-embedding-ada-002'
+    LLM_API_KEY = os.environ.get('LLM_API_KEY')
+    LLM_API_BASE = os.environ.get('LLM_API_BASE')
+    LLM_MODEL = os.environ.get('LLM_MODEL') or 'gpt-3.5-turbo'
+    EMBEDDINGS_API_KEY = os.environ.get('EMBEDDINGS_API_KEY')
+    EMBEDDINGS_API_BASE = os.environ.get('EMBEDDINGS_API_BASE')
+    EMBEDDINGS_MODEL = os.environ.get('EMBEDDINGS_MODEL') or 'text-embedding-ada-002'
     UPLOAD_FOLDER = os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'app', 'static', 'uploads')
 
 class DevelopmentConfig(Config):

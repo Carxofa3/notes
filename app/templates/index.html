@@ -58,12 +58,25 @@
             <label for="primary-color">Primary Color:</label>
             <input type="color" id="primary-color" name="primary-color">
 
-            <h3>AI Configuration</h3>
-            <label for="openai-api-key">OpenAI API Key:</label>
-            <input type="password" id="openai-api-key" name="openai-api-key">
+            <h3>LLM Configuration</h3>
+            <label for="llm-api-key">LLM API Key:</label>
+            <input type="password" id="llm-api-key" name="llm-api-key">
 
-            <label for="openai-api-base">OpenAI API Base URL:</label>
-            <input type="text" id="openai-api-base" name="openai-api-base">
+            <label for="llm-api-base">LLM API Base URL:</label>
+            <input type="text" id="llm-api-base" name="llm-api-base">
+
+            <label for="llm-model">LLM Model:</label>
+            <input type="text" id="llm-model" name="llm-model">
+
+            <h3>Embeddings Configuration</h3>
+            <label for="embeddings-api-key">Embeddings API Key:</label>
+            <input type="password" id="embeddings-api-key" name="embeddings-api-key">
+
+            <label for="embeddings-api-base">Embeddings API Base URL:</label>
+            <input type="text" id="embeddings-api-base" name="embeddings-api-base">
+
+            <label for="embeddings-model">Embeddings Model:</label>
+            <input type="text" id="embeddings-model" name="embeddings-model">
 
             <button id="save-settings-btn">Save Settings</button>
         </div>

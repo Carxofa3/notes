@@ -1,0 +1,30 @@
+{
+  "name": "Ultimate University Notes",
+  "short_name": "Notes",
+  "description": "Local-first, privacy-respecting university lecture note-taking ecosystem with Tailscale P2P sync and autonomous fact-checking",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1e1e2e",
+  "theme_color": "#1e1e2e",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/assets/vite-BF8QNONU.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New Note",
+      "url": "/?action=new",
+      "description": "Quickly create a new lecture note"
+    },
+    {
+      "name": "Fact Check",
+      "url": "/?action=factcheck",
+      "description": "Run autonomous fact checking"
+    }
+  ]
+}

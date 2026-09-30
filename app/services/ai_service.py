@@ -4,12 +4,12 @@ import numpy as np
 from app.models.models import Embedding
 
 def format_text(text):
-    api_key = current_app.config['OPENAI_API_KEY']
-    api_base = current_app.config['OPENAI_API_BASE']
-    model = current_app.config['CHAT_MODEL']
+    api_key = current_app.config.get('LLM_API_KEY')
+    api_base = current_app.config.get('LLM_API_BASE')
+    model = current_app.config.get('LLM_MODEL', 'gpt-3.5-turbo')
 
     if not api_key:
-        raise ValueError("OPENAI_API_KEY not set")
+        return None
 
     if not api_base:
         # Default to OpenAI's API if no base is provided
@@ -37,12 +37,12 @@ def format_text(text):
         return None
 
 def embed_text(text):
-    api_key = current_app.config['OPENAI_API_KEY']
-    api_base = current_app.config['OPENAI_API_BASE']
-    model = current_app.config['EMBEDDING_MODEL']
+    api_key = current_app.config.get('EMBEDDINGS_API_KEY')
+    api_base = current_app.config.get('EMBEDDINGS_API_BASE')
+    model = current_app.config.get('EMBEDDINGS_MODEL', 'text-embedding-ada-002')
 
     if not api_key:
-        raise ValueError("OPENAI_API_KEY not set")
+        return None
 
     if not api_base:
         api_base = "https://api.openai.com/v1"

@@ -1,0 +1,164 @@
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #1e1e2e;
+  --bg-secondary: #181825;
+  --bg-tertiary: #313244;
+  --text-primary: #cdd6f4;
+  --text-secondary: #a6adc8;
+  --accent: #89b4fa;
+  --accent-hover: #b4befe;
+  --border: #45475a;
+  --surface: #24273a;
+  --card: #1e1e2e;
+  --success: #a6e3a1;
+  --warning: #f9e2af;
+  --danger: #f38ba8;
+}
+
+[data-theme="catppuccin-latte"] {
+  --bg-primary: #eff1f5;
+  --bg-secondary: #e6e9ef;
+  --bg-tertiary: #ccd0da;
+  --text-primary: #4c4f69;
+  --text-secondary: #6c6f85;
+  --accent: #1e66f5;
+  --accent-hover: #7287fd;
+  --border: #bcc0cc;
+  --surface: #dce0e8;
+  --card: #ffffff;
+  --success: #40a02b;
+  --warning: #df8e1d;
+  --danger: #d20f39;
+}
+
+[data-theme="nord"] {
+  --bg-primary: #2e3440;
+  --bg-secondary: #242933;
+  --bg-tertiary: #3b4252;
+  --text-primary: #eceff4;
+  --text-secondary: #d8dee9;
+  --accent: #88c0d0;
+  --accent-hover: #81a1c1;
+  --border: #4c566a;
+  --surface: #3b4252;
+  --card: #2e3440;
+  --success: #a3be8c;
+  --warning: #ebcb8b;
+  --danger: #bf616a;
+}
+
+[data-theme="solarized"] {
+  --bg-primary: #002b36;
+  --bg-secondary: #073642;
+  --bg-tertiary: #586e75;
+  --text-primary: #fdf6e3;
+  --text-secondary: #93a1a1;
+  --accent: #268bd2;
+  --accent-hover: #2aa198;
+  --border: #073642;
+  --surface: #073642;
+  --card: #002b36;
+  --success: #859900;
+  --warning: #b58900;
+  --danger: #dc322f;
+}
+
+[data-theme="amoled"] {
+  --bg-primary: #000000;
+  --bg-secondary: #0a0a0a;
+  --bg-tertiary: #161616;
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0a0;
+  --accent: #38bdf8;
+  --accent-hover: #7dd3fc;
+  --border: #262626;
+  --surface: #121212;
+  --card: #050505;
+  --success: #4ade80;
+  --warning: #facc15;
+  --danger: #f87171;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+/* TipTap Prose styling */
+.prose-editor {
+  outline: none;
+}
+.prose-editor p {
+  margin-bottom: 0.75rem;
+  line-height: 1.6;
+}
+.prose-editor h1 {
+  font-size: 1.875rem;
+  font-weight: 700;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  color: var(--accent);
+}
+.prose-editor h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+.prose-editor h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+.prose-editor ul, .prose-editor ol {
+  padding-left: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+.prose-editor ul {
+  list-style-type: disc;
+}
+.prose-editor ol {
+  list-style-type: decimal;
+}
+.prose-editor blockquote {
+  border-left: 4px solid var(--accent);
+  padding-left: 1rem;
+  font-style: italic;
+  color: var(--text-secondary);
+  margin: 1rem 0;
+}
+.prose-editor code {
+  background: var(--bg-tertiary);
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.9em;
+}
+.prose-editor pre {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  padding: 0.75rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 1rem 0;
+}

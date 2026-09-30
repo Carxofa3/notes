@@ -11,18 +11,20 @@ def get_note_by_id(note_id):
     return Note.query.get_or_404(note_id)
 
 def update_note_embeddings(note):
-    """Generates and stores embeddings for the note content."""
-    # Clear existing embeddings for the note
-    Embedding.query.filter_by(note_id=note.id).delete()
+    """Generates and stores embeddings for the note content safely."""
+    try:
+        # Clear existing embeddings for the note
+        Embedding.query.filter_by(note_id=note.id).delete()
 
-    if note.content:
-        # For simplicity, we'll treat the whole content as one phrase.
-        # A more advanced implementation would chunk the text.
-        phrase = note.content
-        vector = ai_service.embed_text(phrase)
-        if vector:
-            embedding = Embedding(note_id=note.id, phrase=phrase, vector=vector)
-            db.session.add(embedding)
+        if note.content:
+            phrase = note.content
+            vector = ai_service.embed_text(phrase)
+            if vector:
+                embedding = Embedding(note_id=note.id, phrase=phrase, vector=vector)
+                db.session.add(embedding)
+    except Exception as e:
+        # Graceful fallback: local offline note taking must never crash on embedding failure
+        pass
 
 def create_note(unit_id, data):
     unit = Unit.query.get_or_404(unit_id)

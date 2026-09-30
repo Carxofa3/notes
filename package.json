@@ -1,0 +1,15 @@
+{
+  "name": "notes-ecosystem",
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node sync_server.js",
+    "sync": "node sync_server.js",
+    "build:frontend": "npm --prefix frontend run build",
+    "dev:frontend": "npm --prefix frontend run dev"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "yjs": "^13.6.27"
+  }
+}

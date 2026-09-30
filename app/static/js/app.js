@@ -23,8 +23,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const closeBtn = document.querySelector('.close-btn');
     const saveSettingsBtn = document.getElementById('save-settings-btn');
     const primaryColorInput = document.getElementById('primary-color');
-    const apiKeyInput = document.getElementById('openai-api-key');
-    const apiBaseInput = document.getElementById('openai-api-base');
+    const llmApiKeyInput = document.getElementById('llm-api-key');
+    const llmApiBaseInput = document.getElementById('llm-api-base');
+    const llmModelInput = document.getElementById('llm-model');
+    const embeddingsApiKeyInput = document.getElementById('embeddings-api-key');
+    const embeddingsApiBaseInput = document.getElementById('embeddings-api-base');
+    const embeddingsModelInput = document.getElementById('embeddings-model');
 
     // State variables
     let selectedLessonId = null;
@@ -50,8 +54,12 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!response.ok) throw new Error('Failed to load settings');
             const settings = await response.json();
             primaryColorInput.value = settings.primary_color || '#007bff';
-            apiKeyInput.value = settings.openai_api_key || '';
-            apiBaseInput.value = settings.openai_api_base || '';
+            llmApiKeyInput.value = settings.llm_api_key || '';
+            llmApiBaseInput.value = settings.llm_api_base || '';
+            llmModelInput.value = settings.llm_model || '';
+            embeddingsApiKeyInput.value = settings.embeddings_api_key || '';
+            embeddingsApiBaseInput.value = settings.embeddings_api_base || '';
+            embeddingsModelInput.value = settings.embeddings_model || '';
             document.documentElement.style.setProperty('--primary-color', primaryColorInput.value);
         } catch (error) {
             console.error('Error loading settings:', error);
@@ -61,8 +69,12 @@ document.addEventListener('DOMContentLoaded', function() {
     async function saveSettings() {
         const settings = [
             { key: 'primary_color', value: primaryColorInput.value },
-            { key: 'openai_api_key', value: apiKeyInput.value },
-            { key: 'openai_api_base', value: apiBaseInput.value },
+            { key: 'llm_api_key', value: llmApiKeyInput.value },
+            { key: 'llm_api_base', value: llmApiBaseInput.value },
+            { key: 'llm_model', value: llmModelInput.value },
+            { key: 'embeddings_api_key', value: embeddingsApiKeyInput.value },
+            { key: 'embeddings_api_base', value: embeddingsApiBaseInput.value },
+            { key: 'embeddings_model', value: embeddingsModelInput.value },
         ];
         try {
             for (const setting of settings) {
