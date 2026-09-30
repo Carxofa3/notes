@@ -119,30 +119,36 @@
       <!-- Theme Switcher -->
       <div class="flex flex-col gap-2 pt-3 border-t border-[var(--border)]">
         <label class="text-xs font-bold text-[var(--text-primary)]">Application Theme</label>
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
           <button
-            class="p-2 rounded-xl text-xs font-medium border text-center transition-all {theme.current === 'dark' ? 'border-[var(--accent)] bg-[var(--card)] text-[var(--accent)]' : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--card)]'}"
+            class="p-2 rounded-xl text-xs font-medium border text-center transition-all {theme.current === 'dark' ? 'border-[var(--accent)] bg-[var(--card)] text-[var(--accent)] font-bold' : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--card)]'}"
             onclick={() => theme.set('dark')}
           >
-            🌙 Midnight Dark
+            🌙 Midnight
           </button>
           <button
-            class="p-2 rounded-xl text-xs font-medium border text-center transition-all {theme.current === 'light' ? 'border-[var(--accent)] bg-[var(--card)] text-[var(--accent)]' : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--card)]'}"
+            class="p-2 rounded-xl text-xs font-medium border text-center transition-all {theme.current === 'light' ? 'border-[var(--accent)] bg-[var(--card)] text-[var(--accent)] font-bold' : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--card)]'}"
             onclick={() => theme.set('light')}
           >
             ☀️ Paper White
           </button>
           <button
-            class="p-2 rounded-xl text-xs font-medium border text-center transition-all {theme.current === 'solarized' ? 'border-[var(--accent)] bg-[var(--card)] text-[var(--accent)]' : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--card)]'}"
+            class="p-2 rounded-xl text-xs font-medium border text-center transition-all {theme.current === 'solarized' ? 'border-[var(--accent)] bg-[var(--card)] text-[var(--accent)] font-bold' : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--card)]'}"
             onclick={() => theme.set('solarized')}
           >
             🌿 Solarized
           </button>
           <button
-            class="p-2 rounded-xl text-xs font-medium border text-center transition-all {theme.current === 'cyberpunk' ? 'border-[var(--accent)] bg-[var(--card)] text-[var(--accent)]' : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--card)]'}"
+            class="p-2 rounded-xl text-xs font-medium border text-center transition-all {theme.current === 'cyberpunk' ? 'border-[var(--accent)] bg-[var(--card)] text-[var(--accent)] font-bold' : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--card)]'}"
             onclick={() => theme.set('cyberpunk')}
           >
             ⚡ Cyberpunk
+          </button>
+          <button
+            class="p-2 rounded-xl text-xs font-medium border text-center transition-all {theme.current === 'amoled' ? 'border-[var(--accent)] bg-[var(--card)] text-[var(--accent)] font-bold' : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--card)]'}"
+            onclick={() => theme.set('amoled')}
+          >
+            🖤 OLED Black
           </button>
         </div>
       </div>

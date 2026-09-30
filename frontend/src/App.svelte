@@ -4,9 +4,14 @@
   import {
     fetchLessons,
     createLesson,
+    updateLesson,
+    deleteLesson,
     fetchUnits,
     createUnit,
+    updateUnit,
+    deleteUnit,
     fetchNotes,
+    fetchAllNotes,
     createNote,
     updateNote,
     deleteNote
@@ -24,6 +29,8 @@
   import TailscalePairingModal from './lib/components/TailscalePairingModal.svelte';
   import FloatingAccessoryBar from './lib/components/FloatingAccessoryBar.svelte';
   import SettingsModal from './lib/components/SettingsModal.svelte';
+  import ItemCustomizerModal from './lib/components/ItemCustomizerModal.svelte';
+  import { analyzeAndCategorize } from './lib/organizer.js';
 
   // State
   let lessons = $state([]);
@@ -32,6 +39,18 @@
   let activeUnit = $state(null);
   let notes = $state([]);
   let activeNote = $state(null);
+  let allNotes = $state([]);
+
+  // Tree & Explorer State
+  let expandedFolders = $state({});
+  let notesByUnit = $state({});
+
+  // Item Customizer Modal
+  let showCustomizer = $state(false);
+  let customizingItem = $state(null);
+
+  // Auto-organizer toast notification
+  let organizerToast = $state('');
 
   // Editor ref
   let editorRef = $state(null);
@@ -58,18 +77,17 @@
 
   async function loadInitialData() {
     lessons = await fetchLessons();
-    if (lessons.length > 0) {
-      await selectLesson(lessons[0]);
-    } else {
-      // Create initial starter lesson & unit if brand new database
-      const starterLesson = await createLesson('Biology 101');
+    if (lessons.length === 0) {
+      const starterLesson = await createLesson('Biology 101', '🧬', '#10b981');
       if (starterLesson) {
         lessons = [starterLesson];
-        const starterUnit = await createUnit(starterLesson.id, 'Cellular Respiration');
+        const starterUnit = await createUnit(starterLesson.id, 'Cellular Respiration', '⚡', '#10b981');
         if (starterUnit) {
           units = [starterUnit];
           const starterNote = await createNote(starterUnit.id, {
             title: 'Cellular Respiration & ATP Synthesis',
+            icon: '📝',
+            color: '#10b981',
             content: `# Cellular Respiration & ATP Synthesis
 
 Cellular respiration is the biochemical process by which cells harvest chemical energy from glucose.
@@ -82,12 +100,39 @@ $$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{C
 - Oxidative phosphorylation produces the bulk of ATP through the electron transport chain.
 `
           });
-          if (starterNote) {
-            notes = [starterNote];
-            activeLesson = starterLesson;
-            activeUnit = starterUnit;
-            activeNote = starterNote;
-          }
+          activeLesson = starterLesson;
+          activeUnit = starterUnit;
+          activeNote = starterNote;
+        }
+      }
+    } else {
+      activeLesson = lessons[0];
+    }
+    await refreshTree();
+  }
+
+  async function refreshTree() {
+    if (!activeLesson && lessons.length > 0) {
+      activeLesson = lessons[0];
+    }
+    if (activeLesson) {
+      units = await fetchUnits(activeLesson.id);
+      const newNotesByUnit = {};
+      for (const u of units) {
+        if (expandedFolders[u.id] === undefined) {
+          expandedFolders[u.id] = true;
+        }
+        const uNotes = await fetchNotes(u.id);
+        newNotesByUnit[u.id] = uNotes;
+      }
+      notesByUnit = newNotesByUnit;
+      allNotes = await fetchAllNotes();
+      notes = activeUnit ? (notesByUnit[activeUnit.id] || []) : allNotes;
+      if (!activeNote && units.length > 0) {
+        const firstNotes = notesByUnit[units[0].id] || [];
+        if (firstNotes.length > 0) {
+          activeNote = firstNotes[0];
+          activeUnit = units[0];
         }
       }
     }
@@ -95,78 +140,179 @@ $$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{C
 
   async function selectLesson(lesson) {
     activeLesson = lesson;
-    units = await fetchUnits(lesson.id);
-    if (units.length > 0) {
-      await selectUnit(units[0]);
-    } else {
-      activeUnit = null;
-      notes = [];
-      activeNote = null;
-    }
+    // Keep sidebar OPEN!
+    await refreshTree();
   }
 
-  async function selectUnit(unit) {
+  function toggleFolder(unit) {
+    expandedFolders[unit.id] = !expandedFolders[unit.id];
     activeUnit = unit;
-    notes = await fetchNotes(unit.id);
-    if (notes.length > 0) {
-      activeNote = notes[0];
-    } else {
-      activeNote = null;
-    }
-    showMobileSidebar = false; // Close drawer on mobile
+    // Keep sidebar OPEN!
   }
 
   function handleSelectNote(note) {
     activeNote = note;
-    showMobileSidebar = false;
+    activeUnit = units.find(u => u.id === note.unit_id) || activeUnit;
+    showMobileSidebar = false; // Only close drawer when clicking a note!
+  }
+
+  async function handleCreateLesson() {
+    const name = prompt('New Course / Subject Name:');
+    if (name && name.trim()) {
+      const l = await createLesson(name.trim(), '📚', '#3b82f6');
+      if (l) {
+        lessons = [...lessons, l];
+        activeLesson = l;
+        await refreshTree();
+      }
+    }
+  }
+
+  async function handleCreateFolder() {
+    if (!activeLesson) {
+      if (lessons.length > 0) activeLesson = lessons[0];
+      else await handleCreateLesson();
+    }
+    if (!activeLesson) return;
+    const name = prompt(`New Folder Name in ${activeLesson.name}:`);
+    if (name && name.trim()) {
+      const u = await createUnit(activeLesson.id, name.trim(), '📁', '#10b981');
+      if (u) {
+        expandedFolders[u.id] = true;
+        activeUnit = u;
+        await refreshTree();
+      }
+    }
+  }
+
+  async function handleCreateNoteInFolder(unit) {
+    activeUnit = unit;
+    const existing = notesByUnit[unit.id] || [];
+    const count = existing.length + 1;
+    const newNote = await createNote(unit.id, {
+      title: `Lecture Note ${count}`,
+      content: `# Lecture Note ${count}\n\n`,
+      icon: '📝',
+      color: unit.color || '#3b82f6'
+    });
+    if (newNote) {
+      expandedFolders[unit.id] = true;
+      await refreshTree();
+      handleSelectNote(newNote);
+    }
   }
 
   async function handleCreateNewNote() {
-    try {
-      if (!activeLesson) {
-        if (lessons.length > 0) {
-          activeLesson = lessons[0];
-        } else {
-          const l = await createLesson('General Lecture');
-          if (l) {
-            lessons = [l];
-            activeLesson = l;
-          }
-        }
+    if (!activeLesson) {
+      if (lessons.length > 0) activeLesson = lessons[0];
+      else {
+        const l = await createLesson('General Studies', '📚', '#3b82f6');
+        lessons = [l];
+        activeLesson = l;
       }
-
-      if (!activeLesson) return;
-
-      if (!activeUnit) {
-        const uList = await fetchUnits(activeLesson.id);
-        if (uList && uList.length > 0) {
-          units = uList;
-          activeUnit = uList[0];
-        } else {
-          const u = await createUnit(activeLesson.id, 'Lecture Notes');
-          if (u) {
-            units = [u];
-            activeUnit = u;
-          }
-        }
-      }
-
-      if (!activeUnit) return;
-
-      const count = notes.length + 1;
-      const newNote = await createNote(activeUnit.id, {
-        title: `Lecture Note ${count}`,
-        content: `# Lecture Note ${count}\n\n`
-      });
-
-      if (newNote) {
-        notes = [newNote, ...notes];
-        activeNote = newNote;
-      }
-      showMobileSidebar = false;
-    } catch (err) {
-      console.error('Failed to create new note:', err);
     }
+    if (!activeUnit) {
+      const existingUnits = await fetchUnits(activeLesson.id);
+      if (existingUnits.length > 0) {
+        activeUnit = existingUnits[0];
+      } else {
+        const u = await createUnit(activeLesson.id, 'Lecture Notes', '📁', '#10b981');
+        units = [u];
+        activeUnit = u;
+      }
+    }
+    await handleCreateNoteInFolder(activeUnit);
+  }
+
+  async function handleDeleteActiveNote() {
+    if (!activeNote) return;
+    if (confirm(`Delete note "${activeNote.title}"?`)) {
+      await deleteNote(activeNote.id);
+      activeNote = null;
+      await refreshTree();
+    }
+  }
+
+  function openCustomizer(item, type) {
+    customizingItem = { ...item, type };
+    showCustomizer = true;
+  }
+
+  async function handleSaveCustomizer(data) {
+    if (data.type === 'lesson') {
+      await updateLesson(data.id, { name: data.name, icon: data.icon, color: data.color });
+    } else if (data.type === 'unit') {
+      await updateUnit(data.id, { name: data.name, icon: data.icon, color: data.color });
+    } else if (data.type === 'note') {
+      await updateNote(data.id, {
+        title: data.title,
+        icon: data.icon,
+        color: data.color,
+        unit_id: data.unit_id
+      });
+      if (activeNote?.id === data.id) {
+        activeNote.title = data.title;
+        activeNote.icon = data.icon;
+        activeNote.color = data.color;
+        activeNote.unit_id = data.unit_id;
+      }
+    }
+    await refreshTree();
+  }
+
+  async function handleDeleteCustomizer(item) {
+    if (item.type === 'lesson') {
+      await deleteLesson(item.id);
+      if (activeLesson?.id === item.id) activeLesson = null;
+    } else if (item.type === 'unit') {
+      await deleteUnit(item.id);
+      if (activeUnit?.id === item.id) activeUnit = null;
+      if (activeNote?.unit_id === item.id) activeNote = null;
+    } else if (item.type === 'note') {
+      await deleteNote(item.id);
+      if (activeNote?.id === item.id) activeNote = null;
+    }
+    await refreshTree();
+  }
+
+  async function handleAutoOrganizeActiveNote() {
+    if (!activeNote) return;
+    const res = analyzeAndCategorize(activeNote.title, activeNote.content, units);
+    if (res.type === 'existing_folder') {
+      await updateNote(activeNote.id, {
+        unit_id: res.unitId,
+        icon: res.suggestedIcon,
+        color: res.suggestedColor
+      });
+      activeNote.unit_id = res.unitId;
+      activeNote.icon = res.suggestedIcon;
+      activeNote.color = res.suggestedColor;
+      expandedFolders[res.unitId] = true;
+      showToast(`🪄 Moved note into folder "${res.unitName}" with ${res.suggestedIcon}!`);
+      await refreshTree();
+    } else if (res.type === 'new_folder') {
+      if (confirm(`🪄 Auto-Organizer suggests creating new folder "${res.unitName}" (${res.suggestedIcon}) for this note. Proceed?`)) {
+        const newUnit = await createUnit(activeLesson?.id || 'default', res.unitName, res.suggestedIcon, res.suggestedColor);
+        if (newUnit) {
+          await updateNote(activeNote.id, {
+            unit_id: newUnit.id,
+            icon: res.suggestedIcon,
+            color: res.suggestedColor
+          });
+          activeNote.unit_id = newUnit.id;
+          activeNote.icon = res.suggestedIcon;
+          activeNote.color = res.suggestedColor;
+          expandedFolders[newUnit.id] = true;
+          showToast(`🪄 Created folder "${res.unitName}" and organized note!`);
+          await refreshTree();
+        }
+      }
+    }
+  }
+
+  function showToast(msg) {
+    organizerToast = msg;
+    setTimeout(() => organizerToast = '', 4000);
   }
 
   async function handleSaveNote(updatedData) {
@@ -175,22 +321,7 @@ $$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{C
     if (res) {
       activeNote.title = res.title;
       activeNote.content = res.content;
-      // Update in notes list
-      const idx = notes.findIndex(n => n.id === activeNote.id);
-      if (idx !== -1) {
-        notes[idx] = { ...notes[idx], title: res.title, content: res.content };
-      }
-    }
-  }
-
-  async function handleDeleteActiveNote() {
-    if (!activeNote) return;
-    if (confirm(`Delete note "${activeNote.title}"?`)) {
-      const ok = await deleteNote(activeNote.id);
-      if (ok) {
-        notes = notes.filter(n => n.id !== activeNote.id);
-        activeNote = notes.length > 0 ? notes[0] : null;
-      }
+      await refreshTree();
     }
   }
 
@@ -315,117 +446,162 @@ $$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{C
   <div class="flex-1 min-h-0 flex relative overflow-hidden">
     <!-- Sidebar: Lessons, Units & Notes List -->
     <aside
-      class="w-72 border-r border-[var(--border)] bg-[var(--bg-secondary)] flex flex-col shrink-0 transition-transform duration-200 z-30 absolute md:static inset-y-0 left-0 pt-[max(env(safe-area-inset-top,0px),1.75rem)] md:pt-0 pb-[max(env(safe-area-inset-bottom,0px),1rem)] md:pb-0 {showMobileSidebar ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'}"
+      class="w-80 border-r border-[var(--border)] bg-[var(--bg-secondary)] flex flex-col shrink-0 transition-transform duration-200 z-30 absolute md:static inset-y-0 left-0 pt-[max(env(safe-area-inset-top,0px),1.75rem)] md:pt-0 pb-[max(env(safe-area-inset-bottom,0px),1rem)] md:pb-0 {showMobileSidebar ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'}"
     >
       <!-- Mobile Drawer Close Header (Mobile Only) -->
       <div class="md:hidden px-3 py-2 border-b border-[var(--border)] flex items-center justify-between bg-[var(--bg-tertiary)]">
-        <span class="text-xs font-bold text-[var(--text-primary)]">Courses & Units</span>
+        <span class="text-xs font-bold text-[var(--text-primary)]">Courses & Folders</span>
         <button
           class="p-1 px-2 rounded-lg bg-[var(--card)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border)]"
           onclick={() => showMobileSidebar = false}
         >✕ Close</button>
       </div>
 
-      <!-- Lessons Selector -->
+      <!-- Explorer Top Bar: Course Selector + Actions -->
       <div class="p-3 border-b border-[var(--border)] flex flex-col gap-2">
-        <div class="flex items-center justify-between text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
-          <span>Courses / Lessons</span>
-          <button
-            class="hover:text-[var(--text-primary)] text-sm px-1"
-            onclick={async () => {
-              const name = prompt('New Course/Lesson Name:');
-              if (name && name.trim()) {
-                const l = await createLesson(name.trim());
-                if (l) {
-                  lessons = [...lessons, l];
-                  selectLesson(l);
-                }
-              }
-            }}
-          >+</button>
+        <div class="flex items-center justify-between text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">
+          <span>Courses</span>
+          <div class="flex items-center gap-1">
+            <button
+              class="px-2 py-0.5 rounded-lg bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-xs text-[var(--accent)] font-semibold transition-colors"
+              onclick={handleCreateLesson}
+              title="Add New Course"
+            >+ Course</button>
+            <button
+              class="px-2 py-0.5 rounded-lg bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-xs text-[var(--accent)] font-semibold transition-colors"
+              onclick={handleCreateFolder}
+              title="Add New Folder in Course"
+            >+ Folder</button>
+          </div>
         </div>
 
-        <div class="flex gap-1 overflow-x-auto pb-1">
+        <!-- Course Tabs with Customizer Trigger -->
+        <div class="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
           {#each lessons as l}
-            <button
-              class="px-2.5 py-1 rounded-lg text-xs font-medium shrink-0 transition-colors {activeLesson?.id === l.id ? 'bg-[var(--accent)] text-white' : 'bg-[var(--card)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'}"
-              onclick={() => selectLesson(l)}
-            >
-              {l.name}
-            </button>
-          {/each}
-        </div>
-      </div>
-
-      <!-- Units List -->
-      <div class="p-3 border-b border-[var(--border)] flex flex-col gap-1.5">
-        <div class="flex items-center justify-between text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
-          <span>Units / Chapters</span>
-          <button
-            class="hover:text-[var(--text-primary)] text-sm px-1"
-            onclick={async () => {
-              if (!activeLesson) return;
-              const name = prompt('New Unit Name:');
-              if (name && name.trim()) {
-                const u = await createUnit(activeLesson.id, name.trim());
-                if (u) {
-                  units = [...units, u];
-                  selectUnit(u);
-                }
-              }
-            }}
-          >+</button>
-        </div>
-
-        <div class="flex flex-col gap-1 max-h-28 overflow-y-auto">
-          {#each units as u}
-            <button
-              class="text-left px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors {activeUnit?.id === u.id ? 'bg-[var(--card)] text-[var(--accent)] border border-[var(--border)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'}"
-              onclick={() => selectUnit(u)}
-            >
-              📂 {u.name}
-            </button>
-          {/each}
-        </div>
-      </div>
-
-      <!-- Notes List -->
-      <div class="flex-1 min-h-0 flex flex-col p-3">
-        <div class="flex items-center justify-between text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
-          <span>Notes ({notes.length})</span>
-          <button
-            class="px-2 py-0.5 rounded bg-[var(--accent)] text-white text-xs font-semibold hover:opacity-90"
-            onclick={handleCreateNewNote}
-          >+ Note</button>
-        </div>
-
-        <div class="flex-1 overflow-y-auto flex flex-col gap-1 pr-1">
-          {#if notes.length === 0}
-            <div class="text-xs text-[var(--text-secondary)] text-center py-6">
-              No notes in this unit yet.
-            </div>
-          {:else}
-            {#each notes as n}
+            <div class="shrink-0 flex items-center rounded-xl border transition-all {activeLesson?.id === l.id ? 'border-[var(--accent)] bg-[var(--card)] shadow-xs' : 'border-[var(--border)] bg-[var(--bg-primary)] opacity-80'}">
               <button
-                class="text-left p-2.5 rounded-xl border transition-all {activeNote?.id === n.id ? 'bg-[var(--card)] border-[var(--accent)] shadow-xs' : 'bg-transparent border-transparent hover:bg-[var(--card)] text-[var(--text-secondary)]'}"
-                onclick={() => handleSelectNote(n)}
+                class="px-2.5 py-1 text-xs font-semibold flex items-center gap-1.5 {activeLesson?.id === l.id ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'}"
+                onclick={() => selectLesson(l)}
               >
-                <div class="font-semibold text-xs text-[var(--text-primary)] truncate">{n.title || 'Untitled Note'}</div>
-                <div class="text-[10px] text-[var(--text-secondary)] truncate mt-0.5">{n.content?.substring(0, 45) || 'Empty note...'}</div>
+                <span>{l.icon || '📚'}</span>
+                <span>{l.name}</span>
               </button>
-            {/each}
-          {/if}
+              <button
+                class="pr-2 pl-0.5 py-1 text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] opacity-60 hover:opacity-100"
+                onclick={() => openCustomizer(l, 'lesson')}
+                title="Customize Course"
+              >⚙️</button>
+            </div>
+          {/each}
+        </div>
+      </div>
+
+      <!-- Folders & Notes Hierarchical Tree -->
+      <div class="flex-1 min-h-0 flex flex-col p-2 overflow-y-auto">
+        <div class="flex items-center justify-between px-2 py-1 mb-1 text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">
+          <span>{activeLesson?.name || 'Explorer'} ({units.length} folders)</span>
+          <button
+            class="px-2 py-0.5 rounded-lg bg-[var(--accent)] text-white text-[11px] font-semibold hover:opacity-90 transition-opacity"
+            onclick={handleCreateFolder}
+            title="Create new folder"
+          >+ Folder</button>
         </div>
 
-        <!-- Note Deletion option if active -->
-        {#if activeNote}
-          <div class="pt-2 border-t border-[var(--border)] mt-2">
+        {#if units.length === 0}
+          <div class="text-xs text-[var(--text-secondary)] text-center py-8 flex flex-col items-center gap-2">
+            <span>📁 No folders in this course yet.</span>
             <button
-              class="w-full py-1 text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-950/20 rounded-lg transition-colors text-center"
-              onclick={handleDeleteActiveNote}
-            >
-              Delete Active Note
-            </button>
+              class="px-3 py-1.5 rounded-xl bg-[var(--accent)] text-white text-xs font-semibold"
+              onclick={handleCreateFolder}
+            >Create First Folder</button>
+          </div>
+        {:else}
+          <div class="flex flex-col gap-1">
+            {#each units as u}
+              <div class="rounded-xl border border-transparent transition-colors {activeUnit?.id === u.id ? 'bg-[var(--card)]/50 border-[var(--border)]/60' : 'hover:bg-[var(--card)]/30'}">
+                <!-- Folder Header Row -->
+                <div class="flex items-center justify-between px-2 py-1.5 rounded-lg group">
+                  <button
+                    class="flex-1 flex items-center gap-2 text-left text-xs font-semibold text-[var(--text-primary)] truncate"
+                    onclick={() => toggleFolder(u)}
+                  >
+                    <!-- Expand/Collapse Chevron -->
+                    <span class="text-[10px] text-[var(--text-secondary)] transition-transform duration-150 inline-block w-3 text-center">
+                      {expandedFolders[u.id] ? '▼' : '▶'}
+                    </span>
+                    <!-- Folder Custom Icon with Color Dot -->
+                    <span class="text-sm">{u.icon || '📁'}</span>
+                    <span class="truncate">{u.name}</span>
+                    <!-- Count Badge -->
+                    <span class="text-[10px] px-1.5 py-0.2 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)] font-normal">
+                      {(notesByUnit[u.id] || []).length}
+                    </span>
+                  </button>
+
+                  <!-- Folder Action Buttons -->
+                  <div class="flex items-center gap-1 opacity-80 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                    <!-- + Note in this folder -->
+                    <button
+                      class="p-1 rounded-md hover:bg-[var(--bg-tertiary)] text-[var(--accent)] text-xs font-bold"
+                      onclick={() => handleCreateNoteInFolder(u)}
+                      title="Add note in {u.name}"
+                    >+</button>
+                    <!-- Customize folder -->
+                    <button
+                      class="p-1 rounded-md hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-[11px]"
+                      onclick={() => openCustomizer(u, 'unit')}
+                      title="Customize folder icon & color"
+                    >⚙️</button>
+                    <!-- Delete folder -->
+                    <button
+                      class="p-1 rounded-md hover:bg-rose-950/30 text-rose-400 text-[11px]"
+                      onclick={() => handleDeleteCustomizer({ id: u.id, type: 'unit', name: u.name })}
+                      title="Delete folder"
+                    >🗑️</button>
+                  </div>
+                </div>
+
+                <!-- Notes inside this Folder (Expanded) -->
+                {#if expandedFolders[u.id]}
+                  <div class="ml-5 pl-2.5 border-l-2 border-[var(--border)] flex flex-col gap-0.5 pb-1 pt-0.5">
+                    {#if (notesByUnit[u.id] || []).length === 0}
+                      <button
+                        class="text-left py-1 px-2 text-[11px] text-[var(--text-secondary)] hover:text-[var(--accent)] italic"
+                        onclick={() => handleCreateNoteInFolder(u)}
+                      >
+                        + Empty folder. Click to add note.
+                      </button>
+                    {:else}
+                      {#each notesByUnit[u.id] || [] as n}
+                        <div class="flex items-center justify-between rounded-lg group/note {activeNote?.id === n.id ? 'bg-[var(--card)] border border-[var(--accent)] shadow-xs' : 'hover:bg-[var(--card)]/60 border border-transparent'}">
+                          <button
+                            class="flex-1 text-left px-2 py-1.5 flex items-center gap-2 truncate"
+                            onclick={() => handleSelectNote(n)}
+                          >
+                            <span class="text-xs">{n.icon || '📝'}</span>
+                            <span class="text-xs text-[var(--text-primary)] truncate font-medium">{n.title || 'Untitled Note'}</span>
+                          </button>
+
+                          <!-- Note Actions -->
+                          <div class="flex items-center gap-0.5 pr-1 opacity-80 md:opacity-0 md:group-note:opacity-100 transition-opacity">
+                            <button
+                              class="p-1 rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-[10px]"
+                              onclick={() => openCustomizer(n, 'note')}
+                              title="Customize note icon/color or move"
+                            >⚙️</button>
+                            <button
+                              class="p-1 rounded hover:bg-rose-950/30 text-rose-400 text-[10px]"
+                              onclick={() => handleDeleteCustomizer({ id: n.id, type: 'note', name: n.title })}
+                              title="Delete note"
+                            >🗑️</button>
+                          </div>
+                        </div>
+                      {/each}
+                    {/if}
+                  </div>
+                {/if}
+              </div>
+            {/each}
           </div>
         {/if}
       </div>
@@ -451,6 +627,7 @@ $$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{C
           onOpenMermaid={() => showMermaid = true}
           onOpenCanvas={() => showCanvas = true}
           onOpenPlotter={() => showPlotter = true}
+          onAutoOrganize={handleAutoOrganizeActiveNote}
         />
       {:else}
         <div class="flex-1 flex flex-col items-center justify-center p-8 text-center text-[var(--text-secondary)] gap-3">
@@ -474,6 +651,7 @@ $$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{C
         onOpenCanvas={() => showCanvas = true}
         onOpenPlotter={() => showPlotter = true}
         onFactCheck={() => showFactCheck = true}
+        onAutoOrganize={handleAutoOrganizeActiveNote}
       />
     </main>
   </div>
@@ -587,4 +765,27 @@ $$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{C
   <SettingsModal
     bind:isOpen={showSettings}
   />
+
+  <ItemCustomizerModal
+    bind:isOpen={showCustomizer}
+    item={customizingItem}
+    {units}
+    onSave={handleSaveCustomizer}
+    onDelete={handleDeleteCustomizer}
+  />
+
+  {#if organizerToast}
+    <div class="fixed bottom-20 left-1/2 -translate-x-1/2 max-w-sm w-[90%] bg-[var(--surface)] text-[var(--text-primary)] border border-[var(--border)] rounded-2xl shadow-2xl p-3 z-50 flex items-center justify-between gap-3 text-xs animate-in fade-in slide-in-from-bottom-2">
+      <div class="flex items-center gap-2">
+        <span class="text-base">🪄</span>
+        <span>{organizerToast}</span>
+      </div>
+      <button
+        class="text-xs px-2 py-1 rounded-lg bg-[var(--bg-tertiary)] hover:bg-[var(--surface-hover)] text-[var(--text-secondary)] font-medium"
+        onclick={() => organizerToast = ''}
+      >
+        ✕
+      </button>
+    </div>
+  {/if}
 </div>

@@ -12,6 +12,7 @@
     note = null,
     onSave = () => {},
     onFactCheck = () => {},
+    onAutoOrganize = () => {},
     onOpenMath = () => {},
     onOpenMermaid = () => {},
     onOpenCanvas = () => {},
@@ -380,6 +381,14 @@
         {:else}
           <span>✨ Study Guide</span>
         {/if}
+      </button>
+
+      <button
+        class="px-2.5 py-1 rounded-lg text-xs font-medium bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--accent)] flex items-center gap-1 shadow-xs transition-colors"
+        onclick={onAutoOrganize}
+        title="Auto-organize note into smart folder & assign domain icon"
+      >
+        <span>🪄 Organize</span>
       </button>
 
       <button

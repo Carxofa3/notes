@@ -9,9 +9,15 @@ import {
   setServerUrl,
   getLocalLessons,
   saveLocalLesson,
+  updateLocalLesson,
+  deleteLocalLesson,
   getLocalUnits,
+  getAllLocalUnits,
   saveLocalUnit,
+  updateLocalUnit,
+  deleteLocalUnit,
   getLocalNotes,
+  getAllLocalNotes,
   getLocalNote,
   saveLocalNote,
   updateLocalNote,
@@ -60,7 +66,7 @@ async function safeFetch(url, options = {}, timeoutMs = 1500) {
   }
 }
 
-// --- Lessons ---
+// --- Lessons (Courses) ---
 export async function fetchLessons() {
   const base = getBase();
   if (base !== null) {
@@ -75,7 +81,7 @@ export async function fetchLessons() {
   return getLocalLessons();
 }
 
-export async function createLesson(name) {
+export async function createLesson(name, icon = '📚', color = '#3b82f6') {
   const base = getBase();
   if (base !== null) {
     const res = await safeFetch(`${base}/api/lessons/`, {
@@ -87,10 +93,22 @@ export async function createLesson(name) {
       try { return await res.json(); } catch (_) {}
     }
   }
-  return saveLocalLesson(name);
+  return saveLocalLesson(name, icon, color);
 }
 
-// --- Units ---
+export async function updateLesson(lessonId, data) {
+  return updateLocalLesson(lessonId, data);
+}
+
+export async function deleteLesson(lessonId) {
+  const base = getBase();
+  if (base !== null) {
+    await safeFetch(`${base}/api/lessons/${lessonId}`, { method: 'DELETE' });
+  }
+  return deleteLocalLesson(lessonId);
+}
+
+// --- Units (Folders / Chapters) ---
 export async function fetchUnits(lessonId) {
   const base = getBase();
   if (base !== null) {
@@ -105,7 +123,11 @@ export async function fetchUnits(lessonId) {
   return getLocalUnits(lessonId);
 }
 
-export async function createUnit(lessonId, name) {
+export async function fetchAllUnits() {
+  return getAllLocalUnits();
+}
+
+export async function createUnit(lessonId, name, icon = '📁', color = '#10b981') {
   const base = getBase();
   if (base !== null) {
     const res = await safeFetch(`${base}/api/units/by-lesson/${lessonId}`, {
@@ -117,7 +139,15 @@ export async function createUnit(lessonId, name) {
       try { return await res.json(); } catch (_) {}
     }
   }
-  return saveLocalUnit(lessonId, name);
+  return saveLocalUnit(lessonId, name, icon, color);
+}
+
+export async function updateUnit(unitId, data) {
+  return updateLocalUnit(unitId, data);
+}
+
+export async function deleteUnit(unitId) {
+  return deleteLocalUnit(unitId);
 }
 
 // --- Notes ---
@@ -135,6 +165,10 @@ export async function fetchNotes(unitId) {
   return getLocalNotes(unitId);
 }
 
+export async function fetchAllNotes() {
+  return getAllLocalNotes();
+}
+
 export async function fetchNote(noteId) {
   const base = getBase();
   if (base !== null) {
@@ -146,7 +180,7 @@ export async function fetchNote(noteId) {
   return getLocalNote(noteId);
 }
 
-export async function createNote(unitId, { title, content }) {
+export async function createNote(unitId, { title, content, icon = '📝', color = '#3b82f6' }) {
   const base = getBase();
   if (base !== null) {
     const res = await safeFetch(`${base}/api/notes/by-unit/${unitId}`, {
@@ -158,10 +192,10 @@ export async function createNote(unitId, { title, content }) {
       try { return await res.json(); } catch (_) {}
     }
   }
-  return saveLocalNote(unitId, { title, content });
+  return saveLocalNote(unitId, { title, content, icon, color });
 }
 
-export async function updateNote(noteId, { title, content }) {
+export async function updateNote(noteId, { title, content, icon, color, unit_id }) {
   const base = getBase();
   if (base !== null) {
     const res = await safeFetch(`${base}/api/notes/${noteId}`, {
@@ -173,7 +207,7 @@ export async function updateNote(noteId, { title, content }) {
       try { return await res.json(); } catch (_) {}
     }
   }
-  return updateLocalNote(noteId, { title, content });
+  return updateLocalNote(noteId, { title, content, icon, color, unit_id });
 }
 
 export async function deleteNote(noteId) {

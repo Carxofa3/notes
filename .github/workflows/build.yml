@@ -197,18 +197,20 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG_NAME="v2.0.1"
-          TITLE="Notes Workstation v2.0.1 — Mobile Punch-Hole Safe Areas, Offline Engine & Settings"
-          NOTES="### Notes Workstation v2.0.1 Release Packages
+          TAG_NAME="v2.0.2"
+          TITLE="Notes Workstation v2.0.2 — File Explorer Tree, Custom Icons & Colors, Smart Auto-Organizer & High-Contrast Themes"
+          NOTES="### Notes Workstation v2.0.2 Release Packages
           
-          This update adds critical mobile optimizations for Android devices (specifically Xiaomi Poco and notch/punch-hole cutout displays):
-          - **Display & Viewport Safe Areas**: Automatic \`env(safe-area-inset-*)\` padding preventing clipping under the top camera cutout and bottom system navigation bar.
-          - **100% Offline Note Engine**: Instant note, course, and unit creation stored locally with zero network delay or crashes.
-          - **Mobile Bottom Navigation Bar**: Quick-access bar for Courses, Editor, New Note, Search, and Settings.
-          - **New Settings Panel**: Easily configure backend / Tailscale server IP, test ping latency, switch themes, and manage local storage cache.
+          This major update brings a full File Explorer layout, customizable folder/note icons and colors, smart auto-categorization, and distinct theme styling:
+          - **File Explorer Tree View**: Full collapsible folder hierarchy (\`▶\`/\`▼\`), folder note counts, inline creation, and safe deletion.
+          - **Custom Icons & Colors**: Choose from 24 emoji icons and 12 vibrant colors for courses, folders, and notes; relocate notes between folders at any time via the ⚙️ modal.
+          - **Smart Auto-Organizer**: 🪄 One-click organization that inspects note title and content to auto-assign notes to existing user folders or suggest new ones.
+          - **5 Distinct Themes**: High-contrast, completely differentiated color schemes (Dark Mocha, Paper White Light, Solarized Dark, Neon Cyberpunk, and AMOLED Pitch Black).
+          - **Persistent Sidebar**: Sidebar stays open while navigating courses and toggling folders; closes strictly when opening a note.
+          - **Permanent Android Keystore**: Signed with permanent release keystore to prevent package conflicts on updates.
 
-          #### Downloads by Device & OS:
-          - **Android (Xiaomi Poco / All Phones)**: \`Notes-Workstation-Android-Universal-v2.0.1.apk\`
+          #### Downloads:
+          - **Android (Xiaomi Poco / All Devices)**: \`Notes-Workstation-Android-Universal-v2.0.2.apk\`
           - **Windows Desktop**: \`*.exe\`, \`*.msi\`, \`install.ps1\`
           - **Linux**: \`*.deb\`, \`*.AppImage\`, \`install.sh\`"
             

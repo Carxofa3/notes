@@ -6,6 +6,7 @@
     onOpenCanvas = () => {},
     onOpenPlotter = () => {},
     onFactCheck = () => {},
+    onAutoOrganize = () => {},
     onUndo = () => {},
     onRedo = () => {}
   } = $props();
@@ -22,7 +23,8 @@
     { label: '✏️ Draw', title: 'Stylus Canvas', action: () => onOpenCanvas() },
     { label: '📈 Plot', title: '2D Function Plot', action: () => onOpenPlotter() },
     { label: '📊 Diagram', title: 'Mermaid Diagram', action: () => onOpenMermaid() },
-    { label: '🔍 Fact-Check', title: 'Fact-Check Document', action: () => onFactCheck() }
+    { label: '🔍 Fact-Check', title: 'Fact-Check Document', action: () => onFactCheck() },
+    { label: '🪄 Organize', title: 'Auto-Organize Note', action: () => onAutoOrganize() }
   ];
 </script>
 
