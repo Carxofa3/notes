@@ -3,9 +3,12 @@ name: Build & Release Notes Ecosystem
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    tags:
+      - 'v*'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   test-backend:
@@ -55,9 +58,9 @@ jobs:
       matrix:
         include:
           - platform: 'windows-latest'
-            args: ''
+            os_name: 'windows'
           - platform: 'ubuntu-22.04'
-            args: ''
+            os_name: 'linux'
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -79,15 +82,16 @@ jobs:
       - name: Build frontend
         run: npm --prefix frontend run build
       - name: Build Tauri Desktop App
-        run: npx tauri build ${{ matrix.args }}
+        run: npx tauri build
       - name: Upload Desktop Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: desktop-binaries-${{ matrix.platform }}
+          name: desktop-${{ matrix.os_name }}
           path: |
-            src-tauri/target/release/bundle/
-            src-tauri/target/release/*.exe
-            src-tauri/target/release/notes-workstation
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*-setup.exe
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/appimage/*.AppImage
 
   build-android:
     name: Android Build (APK)
@@ -104,15 +108,13 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '17'
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-      - name: Install NDK
+      - name: Setup Android NDK
         run: |
           ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;26.1.10909125"
-      - name: Install Rust and Android Targets
+      - name: Install Rust and Android Target
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+          targets: aarch64-linux-android
       - name: Install dependencies and build frontend
         run: |
           npm ci
@@ -123,9 +125,59 @@ jobs:
           NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
         run: |
           npx tauri android init --ci
-          npx tauri android build --apk
+          npx tauri android build --apk --target aarch64-linux-android
+      - name: Find and Prepare APK
+        run: |
+          mkdir -p release-apk
+          find src-tauri/gen/android/ -name "*.apk" -exec cp {} release-apk/Notes-Workstation-Android-v2.0.0.apk \;
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: src-tauri/gen/android/app/build/outputs/apk/
+          path: release-apk/*.apk
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: [build-desktop, build-android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all workflow artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Collect Release Binaries
+        run: |
+          mkdir -p release-assets
+          cp install.ps1 release-assets/Notes-Workstation-Installer-Windows.ps1
+          cp install.sh release-assets/Notes-Workstation-Installer-Linux.sh
+          
+          # Find all installers and APKs from downloaded artifacts
+          find artifacts/ -type f \( -name "*.apk" -o -name "*.msi" -o -name "*.exe" -o -name "*.deb" -o -name "*.AppImage" \) -exec cp {} release-assets/ \;
+          ls -la release-assets/
+      - name: Create or Update Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="v2.0.0"
+          TITLE="Notes Workstation v2.0.0 — University Knowledge & Fact-Checking Workstation"
+          NOTES="### Notes Workstation v2.0.0 Release Packages
+          
+          Welcome to Notes Workstation v2.0.0! Built specifically for STEM university students with real-time multi-source fact-checking, course lecture slide RAG, llama.cpp escalation, and P2P synchronization.
+
+          #### Downloads by Device & OS:
+          - **Android Phones & Tablets**: \`Notes-Workstation-Android-v2.0.0.apk\` (Native ARM64 / JNI WebView)
+          - **Windows Desktop**: 
+            - \`notes-workstation_0.1.0_x64-setup.exe\` (NSIS Easy Setup Installer)
+            - \`notes-workstation_0.1.0_x64_en-US.msi\` (Windows Installer Package)
+            - \`Notes-Workstation-Installer-Windows.ps1\` (Automated Desktop Shortcut Setup)
+          - **Linux (Ubuntu, Debian, Fedora, Arch)**:
+            - \`*.deb\` Debian/Ubuntu Package
+            - \`*.AppImage\` Standalone Executable
+            - \`Notes-Workstation-Installer-Linux.sh\` (Automated App Menu Setup)
+          - **Universal Desktop Runner**:
+            - Run \`desktop.py\` or double-click \`run_desktop.bat\` / \`run_desktop.sh\`."
+            
+          # Create or edit release
+          gh release view "$TAG_NAME" || gh release create "$TAG_NAME" release-assets/* --title "$TITLE" --notes "$NOTES" --latest
+          gh release upload "$TAG_NAME" release-assets/* --clobber

@@ -15,3 +15,6 @@ Pillow==11.0.0
 # AI and Machine Learning
 requests==2.31.0
 numpy
+pypdf>=3.0.0
+pywebview>=5.0.0
+

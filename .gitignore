@@ -75,4 +75,6 @@ src-tauri/target/
 src-tauri/gen/schemas/
 src-tauri/gen/android/
 target/
+release-dist/
+
 
