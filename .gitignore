@@ -69,3 +69,10 @@ GEMINI.md
 node_modules/
 frontend/node_modules/
 app/static/uploads/slides/
+
+# Tauri / Rust
+src-tauri/target/
+src-tauri/gen/schemas/
+src-tauri/gen/android/
+target/
+

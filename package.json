@@ -6,10 +6,19 @@
     "start": "node sync_server.js",
     "sync": "node sync_server.js",
     "build:frontend": "npm --prefix frontend run build",
-    "dev:frontend": "npm --prefix frontend run dev"
+    "dev:frontend": "npm --prefix frontend run dev",
+    "desktop": "python desktop.py",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "tauri:android": "tauri android dev",
+    "tauri:android:build": "tauri android build --apk"
   },
   "dependencies": {
     "ws": "^8.18.0",
     "yjs": "^13.6.27"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.0"
   }
 }

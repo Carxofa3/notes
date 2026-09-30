@@ -8,8 +8,8 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
-dist-ssr
+# dist (tracked for zero-install desktop distribution)
+# dist-ssr
 *.local
 
 # Editor directories and files

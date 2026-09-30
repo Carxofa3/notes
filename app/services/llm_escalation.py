@@ -44,13 +44,51 @@ Student Notes:
         return self._call_llm(prompt)
 
     def _call_llm(self, prompt: str) -> str:
-        # Check if remote Tailscale node is configured in settings
-        tailscale_node = current_app.config.get('TAILSCALE_LLM_NODE') # e.g. "http://desktop-gpu.tailnet-xyz.ts.net:11434"
-        api_base = tailscale_node or current_app.config.get('LLM_API_BASE') or "https://api.openai.com/v1"
-        api_key = current_app.config.get('LLM_API_KEY') or "ollama-no-key-needed"
-        model = current_app.config.get('LLM_MODEL') or "llama3.2"
+        # Check if remote Tailscale node or llama.cpp instance is configured in settings
+        llm_node = current_app.config.get('LLAMA_CPP_NODE') or current_app.config.get('TAILSCALE_LLM_NODE') # e.g. "http://desktop-gpu.tailnet-xyz.ts.net:8080"
+        api_base = llm_node or current_app.config.get('LLM_API_BASE') or "http://localhost:8080"
+        api_key = current_app.config.get('LLM_API_KEY') or "llamacpp-no-key-needed"
+        model = current_app.config.get('LLM_MODEL') or "default"
 
-        # If it's an Ollama instance
+        # 1. First-class llama.cpp server support (standard llama-server port :8080)
+        if ":8080" in api_base or "llama" in api_base.lower():
+            # Try native llama.cpp /completion endpoint first for maximum speed & zero overhead
+            try:
+                resp = requests.post(
+                    f"{api_base.rstrip('/')}/completion",
+                    json={
+                        "prompt": f"<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n",
+                        "n_predict": 1024,
+                        "temperature": 0.2,
+                        "stop": ["<|im_end|>", "</s>"]
+                    },
+                    timeout=45
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    content = data.get("content") or data.get("response") or ""
+                    if content.strip():
+                        return content.strip()
+            except Exception as e:
+                print(f"llama.cpp native /completion error, trying OpenAI endpoint: {e}")
+
+            # Try llama.cpp /v1/chat/completions
+            try:
+                resp = requests.post(
+                    f"{api_base.rstrip('/')}/v1/chat/completions",
+                    headers={"Content-Type": "application/json"},
+                    json={
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.2
+                    },
+                    timeout=45
+                )
+                if resp.status_code == 200:
+                    return resp.json()['choices'][0]['message']['content'].strip()
+            except Exception as e:
+                print(f"llama.cpp /v1/chat/completions unreachable: {e}")
+
+        # 2. Ollama legacy fallback (:11434)
         if ":11434" in api_base:
             try:
                 resp = requests.post(

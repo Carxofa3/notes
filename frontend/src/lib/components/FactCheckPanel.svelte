@@ -222,7 +222,7 @@
                 </div>
               {/if}
 
-              <!-- Heavy LLM Escalation (Ollama / Cloud) -->
+              <!-- Heavy LLM Escalation (llama.cpp / Tailscale GPU) -->
               <div class="flex items-center justify-between pt-1 border-t border-[var(--border)]">
                 <button
                   class="text-[11px] font-medium text-[var(--accent)] hover:underline flex items-center gap-1"
@@ -231,9 +231,9 @@
                 >
                   {#if escalatingIndex === index}
                     <span class="animate-spin inline-block w-2.5 h-2.5 border-2 border-[var(--accent)] border-t-transparent rounded-full"></span>
-                    <span>Escalating to LLM over Tailscale...</span>
+                    <span>Querying llama.cpp over Tailscale...</span>
                   {:else}
-                    <span>⚡ Escalate to Heavy LLM (Ollama/vLLM)</span>
+                    <span>⚡ Escalate to llama.cpp (:8080)</span>
                   {/if}
                 </button>
               </div>

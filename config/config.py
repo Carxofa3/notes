@@ -9,7 +9,8 @@ class Config:
     JSON_SORT_KEYS = False
     LLM_API_KEY = os.environ.get('LLM_API_KEY')
     LLM_API_BASE = os.environ.get('LLM_API_BASE')
-    LLM_MODEL = os.environ.get('LLM_MODEL') or 'gpt-3.5-turbo'
+    LLAMA_CPP_NODE = os.environ.get('LLAMA_CPP_NODE') or os.environ.get('TAILSCALE_LLM_NODE') or 'http://localhost:8080'
+    LLM_MODEL = os.environ.get('LLM_MODEL') or 'default'
     EMBEDDINGS_API_KEY = os.environ.get('EMBEDDINGS_API_KEY')
     EMBEDDINGS_API_BASE = os.environ.get('EMBEDDINGS_API_BASE')
     EMBEDDINGS_MODEL = os.environ.get('EMBEDDINGS_MODEL') or 'text-embedding-ada-002'
