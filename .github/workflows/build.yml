@@ -200,19 +200,20 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG_NAME="v2.0.4"
-          TITLE="Notes Workstation v2.0.4 — ChatGPT Codeboxes, Auto-Highlighting & Mobile UX"
-          NOTES="### Notes Workstation v2.0.4 Release Packages
+          TAG_NAME="v2.0.5"
+          TITLE="Notes Workstation v2.0.5 — Fix PC White Screen & Relative Asset Resolution"
+          NOTES="### Notes Workstation v2.0.5 Release Packages
           
-          This release introduces sleek ChatGPT-style codeboxes with language auto-detection, comprehensive mobile responsiveness, and easy phone-to-PC connection:
-          - **ChatGPT-Style Codeboxes**: Re-engineered code block widgets with an Obsidian live-preview feel and ChatGPT aesthetic: dark slate container, top header bar displaying the language name, and an animated Copy Code button with clipboard/checkmark SVG feedback.
-          - **Language Auto-Detection & High-Contrast Syntax Highlighting**: Powered by \`lowlight\` (Highlight.js) supporting 35+ languages (Python, JS, TS, C++, Rust, Go, SQL, Bash, HTML/CSS, etc.) with automatic language detection when untagged and vibrant One Dark / Catppuccin Mocha syntax tokens.
-          - **Mobile Container Overflow Fixes**: Restructured top toolbar into 2 non-wrapping swipeable strips, made math palette and modal grids responsive to small phone screens, and adjusted Omnibox top margin to prevent mobile keyboard cutoff.
-          - **LAN / Tailscale Phone-to-PC Sync**: Flask backend now binds to \`0.0.0.0:5000\` for LAN/Tailscale access. Workstation Settings modal now includes quick Wi-Fi connection presets (\`http://192.168.0.45:5000\`) and an in-app setup guide.
-          - **Unified Live Editor**: In-place KaTeX math, tables, code blocks, and markdown notes all editable in live preview mode.
+          This release fixes the desktop white-screen issue on Windows & Linux and ensures robust asset loading:
+          - **Fix PC White Screen (Asset Path Resolution)**: Configured Vite with \`base: './'\` (relative paths) so all HTML, JS, CSS, and font assets load properly through Tauri's internal protocol on desktop, eliminating the blank white screen caused by root-relative paths.
+          - **Service Worker & Cache Poisoning Purge**: Removed aggressive service worker caching that was serving stale HTML referencing deleted bundles, and added auto-cleanup that actively unregisters legacy service workers and clears CacheStorage.
+          - **Default Dark Window Canvas**: Added inline \`background-color: #1e1e2e\` to \`index.html\` so the window canvas matches the dark theme from the very first frame without any white flash.
+          - **Desktop Developer Tools Enabled**: Integrated the \`devtools\` feature into release builds for desktop inspection (\`Ctrl+Shift+I\` or right-click Inspect).
+          - **ChatGPT-Style Codeboxes & Syntax Auto-Highlighting**: Dark slate container, language badge header bar, animated Copy Code button with checkmark feedback, and 35+ languages supported via \`lowlight\`.
+          - **Mobile UI & Responsive Toolbar**: 2-row swipeable action bar, non-overlapping modals, and keyboard-safe Omnibox.
 
           #### Downloads:
-          - **Android (Universal APK)**: \`Notes-Workstation-Android-Universal-v2.0.3.apk\`
+          - **Android (Universal APK)**: \`Notes-Workstation-Android-Universal-v0.2.4.apk\`
           - **Windows Desktop**: \`*.exe\`, \`*.msi\`, \`install.ps1\`
           - **Linux**: \`*.deb\`, \`*.AppImage\`, \`install.sh\`"
             

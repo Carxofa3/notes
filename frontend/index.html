@@ -8,17 +8,31 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="manifest" href="/manifest.json" />
     <title>Ultimate University Notes</title>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        background-color: #1e1e2e;
+        color: #cdd6f4;
+      }
+    </style>
   </head>
   <body>
     <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
+    <script type="module" src="./src/main.js"></script>
     <script>
+      // Clean up any stale service workers or poisoned caches from previous builds
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(err => {
-            console.log('SW registration skipped:', err);
-          });
-        });
+        navigator.serviceWorker.getRegistrations().then(function(regs) {
+          for (var r of regs) { r.unregister(); }
+        }).catch(function() {});
+      }
+      if ('caches' in window) {
+        caches.keys().then(function(names) {
+          for (var name of names) { caches.delete(name); }
+        }).catch(function() {});
       }
     </script>
   </body>
