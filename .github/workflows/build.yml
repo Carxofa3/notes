@@ -110,7 +110,10 @@ jobs:
           java-version: '17'
       - name: Setup Android NDK
         run: |
-          ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;26.1.10909125"
+          export ANDROID_HOME="/usr/local/lib/android/sdk"
+          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> $GITHUB_ENV
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;26.1.10909125"
+          echo "NDK_HOME=/usr/local/lib/android/sdk/ndk/26.1.10909125" >> $GITHUB_ENV
       - name: Install Rust and Android Target
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -121,9 +124,9 @@ jobs:
           npm --prefix frontend ci
           npm --prefix frontend run build
       - name: Build Android APK
-        env:
-          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
         run: |
+          export ANDROID_HOME="/usr/local/lib/android/sdk"
+          export NDK_HOME="/usr/local/lib/android/sdk/ndk/26.1.10909125"
           npx tauri android init --ci
           npx tauri android build --apk --target aarch64-linux-android
       - name: Find and Prepare APK
@@ -138,6 +141,7 @@ jobs:
 
   publish-release:
     name: Publish GitHub Release
+    if: always() && !cancelled()
     needs: [build-desktop, build-android]
     runs-on: ubuntu-latest
     steps:
