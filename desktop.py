@@ -77,7 +77,8 @@ def main():
 
     # 1. Determine Flask port
     flask_port = args.port or find_free_port(5000)
-    host = '127.0.0.1'
+    host = '0.0.0.0'
+    local_check_url = f"http://127.0.0.1:{flask_port}"
 
     # 2. Start Yjs P2P sync server in background
     sync_proc = start_sync_server(root_dir, args.sync_port)
@@ -96,12 +97,11 @@ def main():
     flask_thread.start()
 
     # 4. Wait for Flask to become ready
-    flask_url = f"http://{host}:{flask_port}"
-    print(f"[Desktop] Initializing backend at {flask_url}...")
-    if not wait_for_server(flask_url, timeout=10):
+    print(f"[Desktop] Initializing backend on all interfaces port {flask_port} (LAN & Tailscale ready)...")
+    if not wait_for_server(local_check_url, timeout=10):
         print(f"[Desktop] Warning: Backend server did not respond quickly, continuing anyway.")
 
-    target_url = "http://localhost:5173" if args.dev else flask_url
+    target_url = "http://localhost:5173" if args.dev else local_check_url
 
     # 5. Launch native WebView or browser fallback
     has_webview = False

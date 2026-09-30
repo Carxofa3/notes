@@ -36,13 +36,13 @@
   }
 </script>
 
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-  <div class="w-full max-w-2xl rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-2xl p-6 flex flex-col gap-4">
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4">
+  <div class="w-full max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-2xl p-4 sm:p-6 flex flex-col gap-3.5">
     <!-- Header -->
-    <div class="flex items-center justify-between border-b border-[var(--border)] pb-3">
+    <div class="flex items-center justify-between border-b border-[var(--border)] pb-2.5">
       <div>
-        <h2 class="text-lg font-bold text-[var(--text-primary)]">MathLive Visual Formula Builder</h2>
-        <p class="text-xs text-[var(--text-secondary)]">Click math templates or type LaTeX directly for instant lecture notes</p>
+        <h2 class="text-base sm:text-lg font-bold text-[var(--text-primary)]">MathLive Formula Builder</h2>
+        <p class="text-[11px] sm:text-xs text-[var(--text-secondary)]">Click math templates or type LaTeX directly for instant lecture notes</p>
       </div>
       <button 
         class="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xl p-1"
@@ -51,7 +51,7 @@
     </div>
 
     <!-- Live KaTeX Preview Box -->
-    <div class="p-6 rounded-xl bg-[var(--card)] border border-[var(--border)] min-h-[90px] flex items-center justify-center overflow-x-auto text-[var(--text-primary)]">
+    <div class="p-4 sm:p-6 rounded-xl bg-[var(--card)] border border-[var(--border)] min-h-[70px] sm:min-h-[90px] flex items-center justify-center overflow-x-auto text-[var(--text-primary)]">
       {@html renderedHtml}
     </div>
 
@@ -72,11 +72,11 @@
       />
     </div>
 
-    <!-- Category Tabs -->
-    <div class="flex gap-1 border-b border-[var(--border)] pb-1 overflow-x-auto">
+    <!-- Category Tabs (Smooth swipe on mobile) -->
+    <div class="flex gap-1 border-b border-[var(--border)] pb-1 overflow-x-auto no-scrollbar flex-nowrap shrink-0">
       {#each Object.keys(MATH_SYMBOLS) as cat}
         <button
-          class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors {activeCategory === cat ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'}"
+          class="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors {activeCategory === cat ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'}"
           onclick={() => activeCategory = cat}
         >
           {cat}
@@ -85,7 +85,7 @@
     </div>
 
     <!-- Visual Symbol Palette Grid -->
-    <div class="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-40 overflow-y-auto p-1">
+    <div class="grid grid-cols-3 sm:grid-cols-6 gap-2 max-h-40 overflow-y-auto p-1">
       {#each MATH_SYMBOLS[activeCategory] || [] as item}
         <button
           class="flex flex-col items-center justify-center p-2 rounded-lg bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] transition-transform hover:scale-105 active:scale-95"

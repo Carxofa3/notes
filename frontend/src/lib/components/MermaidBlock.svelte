@@ -41,13 +41,13 @@
   }
 </script>
 
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-  <div class="w-full max-w-4xl h-[85vh] rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-2xl p-6 flex flex-col gap-4">
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4">
+  <div class="w-full max-w-[95vw] sm:max-w-4xl max-h-[92vh] overflow-y-auto rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-2xl p-4 sm:p-6 flex flex-col gap-3.5">
     <!-- Header -->
-    <div class="flex items-center justify-between border-b border-[var(--border)] pb-3">
+    <div class="flex items-center justify-between border-b border-[var(--border)] pb-2.5">
       <div>
-        <h2 class="text-lg font-bold text-[var(--text-primary)]">Mermaid.js Declarative Diagram Studio</h2>
-        <p class="text-xs text-[var(--text-secondary)]">Create flowcharts, sequence diagrams, class hierarchies & state machines</p>
+        <h2 class="text-base sm:text-lg font-bold text-[var(--text-primary)]">Mermaid.js Diagram Studio</h2>
+        <p class="text-[11px] sm:text-xs text-[var(--text-secondary)]">Create flowcharts, sequence diagrams, class hierarchies & state machines</p>
       </div>
       <button 
         class="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xl p-1"
@@ -55,12 +55,12 @@
       >&times;</button>
     </div>
 
-    <!-- Template Pills -->
-    <div class="flex gap-2 items-center text-xs text-[var(--text-secondary)]">
-      <span>Templates:</span>
+    <!-- Template Pills (Smooth swipe on mobile) -->
+    <div class="flex gap-1.5 items-center text-xs text-[var(--text-secondary)] overflow-x-auto no-scrollbar flex-nowrap shrink-0">
+      <span class="shrink-0 font-medium">Templates:</span>
       {#each MERMAID_TEMPLATES as tmpl}
         <button
-          class="px-2.5 py-1 rounded-lg bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--text-primary)] font-medium"
+          class="shrink-0 px-2.5 py-1 rounded-lg bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--text-primary)] font-medium"
           onclick={() => { code = tmpl.code; renderDiagram(); }}
         >
           {tmpl.name}
@@ -69,7 +69,7 @@
     </div>
 
     <!-- Main Workspace (Editor + SVG Preview) -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-0">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 flex-1 min-h-[350px]">
       <!-- Code Editor Side -->
       <div class="flex flex-col gap-2 h-full">
         <span class="text-xs font-semibold text-[var(--text-secondary)]">Mermaid DSL Code</span>

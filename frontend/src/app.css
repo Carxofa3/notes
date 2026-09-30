@@ -203,21 +203,191 @@ input::placeholder, textarea::placeholder {
 
 /* Code blocks */
 .cm-codeblock-widget, .cm-codeblock {
-  background-color: var(--bg-secondary) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 8px !important;
-  margin: 0.75rem 0 !important;
-  padding: 0.75rem 1rem !important;
+  background-color: transparent !important;
+  border: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  max-width: 100% !important;
+}
+
+/* ========================================================
+   ChatGPT-Style Codeboxes & High-Contrast Syntax Highlighting
+   ======================================================== */
+
+.chatgpt-codebox {
+  margin: 1.25rem 0 !important;
+  border-radius: 0.75rem !important;
+  overflow: hidden !important;
+  background-color: #181825 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  max-width: 100% !important;
+}
+
+.chatgpt-code-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 0.5rem 1rem !important;
+  background-color: #11111b !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  user-select: none !important;
+  cursor: pointer !important;
+}
+
+.chatgpt-code-lang {
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  color: #a6adc8 !important;
+  text-transform: lowercase !important;
+  letter-spacing: 0.05em !important;
+  font-family: inherit !important;
+}
+
+.chatgpt-code-copy {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.375rem !important;
+  padding: 0.25rem 0.625rem !important;
+  font-size: 0.75rem !important;
+  font-weight: 500 !important;
+  color: #cdd6f4 !important;
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 0.375rem !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  user-select: none !important;
+  line-height: 1 !important;
+}
+
+.chatgpt-code-copy:hover {
+  background-color: rgba(255, 255, 255, 0.14) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.24) !important;
+}
+
+.chatgpt-code-copy.copied {
+  color: #a6e3a1 !important;
+  background-color: rgba(166, 227, 161, 0.15) !important;
+  border-color: rgba(166, 227, 161, 0.4) !important;
+}
+
+.chatgpt-code-pre {
+  margin: 0 !important;
+  padding: 0.875rem 1rem !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  background-color: #181825 !important;
+}
+
+.chatgpt-code-body {
+  display: block !important;
+  font-family: inherit !important;
+  font-size: 0.875rem !important;
+  line-height: 1.65 !important;
+  tab-size: 2 !important;
+  color: #cdd6f4 !important;
+}
+
+.chatgpt-code-line {
+  display: block !important;
+  min-height: 1.4em !important;
+  white-space: pre !important;
+  cursor: text !important;
+  padding: 0 !important;
+}
+
+/* Source mode code fence styling (when cursor is editing inside ```) */
+.cm-codeblock-source {
+  background-color: rgba(24, 24, 37, 0.5) !important;
+  border-left: 3px solid var(--accent, #6366f1) !important;
+  padding-left: 0.75rem !important;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
   font-size: 0.875rem !important;
 }
 
+/* One Dark / Catppuccin Mocha High-Contrast Syntax Colors */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-subst {
+  color: #c678dd !important; /* Bright Magenta / Violet */
+  font-weight: 600 !important;
+}
+
+.hljs-function,
+.hljs-title.function_,
+.hljs-title.class_ {
+  color: #61afef !important; /* Bright Blue */
+  font-weight: 600 !important;
+}
+
+.hljs-title,
+.hljs-section {
+  color: #61afef !important;
+  font-weight: 600 !important;
+}
+
+.hljs-string,
+.hljs-attribute,
+.hljs-addition {
+  color: #98c379 !important; /* Vibrant Emerald / Mint */
+}
+
+.hljs-number,
+.hljs-literal {
+  color: #d19a66 !important; /* Warm Amber / Orange */
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: #7f849c !important; /* Muted Slate / Grey */
+  font-style: italic !important;
+}
+
+.hljs-type,
+.hljs-class {
+  color: #e5c07b !important; /* Gold / Yellow */
+}
+
+.hljs-params,
+.hljs-variable {
+  color: #e06c75 !important; /* Soft Coral Red */
+}
+
+.hljs-built_in,
+.hljs-builtin-name {
+  color: #56b6c2 !important; /* Cyan / Aqua */
+}
+
+.hljs-meta {
+  color: #c678dd !important;
+}
+
+.hljs-attr {
+  color: #d19a66 !important;
+}
+
+.hljs-tag,
+.hljs-name {
+  color: #e06c75 !important;
+}
+
+.hljs-punctuation {
+  color: #abb2bf !important;
+}
+
 /* Tables */
-.cm-table-widget table {
+.cm-table-widget, .cm-editor table {
   border-collapse: collapse !important;
   width: 100% !important;
   margin: 0.75rem 0 !important;
   border: 1px solid var(--border) !important;
+  display: block !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
 }
 
 .cm-table-widget th, .cm-table-widget td {
@@ -229,6 +399,27 @@ input::placeholder, textarea::placeholder {
 .cm-table-widget th {
   background-color: var(--bg-tertiary) !important;
   font-weight: 600 !important;
+}
+
+/* Responsive code and math */
+.cm-math-block, .cm-codeblock-widget, .cm-codeblock {
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cm-editor .cm-content {
+  overflow-wrap: break-word !important;
+  word-break: break-word !important;
+}
+
+/* Utility to hide scrollbars while allowing smooth swipe */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+}
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
 }
 
 /* Custom scrollbars */

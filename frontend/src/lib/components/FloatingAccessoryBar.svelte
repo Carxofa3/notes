@@ -28,8 +28,8 @@
   ];
 </script>
 
-<div class="w-full bg-[var(--bg-secondary)] border-t border-[var(--border)] px-2 py-1.5 flex items-center justify-between gap-1 overflow-x-auto shadow-md">
-  <div class="flex items-center gap-1">
+<div class="w-full bg-[var(--bg-secondary)] border-t border-[var(--border)] px-2 py-1 flex items-center gap-1 shadow-md shrink-0 overflow-hidden">
+  <div class="flex-1 flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
     {#each QUICK_ITEMS as item}
       <button
         class="shrink-0 px-2.5 py-1 rounded-lg bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-xs text-[var(--text-primary)] transition-transform active:scale-95 {item.class || ''}"
@@ -41,7 +41,7 @@
     {/each}
   </div>
 
-  <div class="flex items-center gap-1 border-l border-[var(--border)] pl-1.5 shrink-0">
+  <div class="flex items-center gap-1 border-l border-[var(--border)] pl-1.5 shrink-0 bg-[var(--bg-secondary)]">
     <button
       class="px-2 py-1 rounded-lg bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-xs text-[var(--text-secondary)]"
       onclick={onUndo}

@@ -68,9 +68,9 @@
 </script>
 
 {#if isOpen}
-  <div class="fixed inset-0 z-50 flex items-start justify-center pt-20 bg-black/60 backdrop-blur-xs p-4" onclick={() => isOpen = false}>
+  <div class="fixed inset-0 z-50 flex items-start justify-center pt-3 sm:pt-16 bg-black/60 backdrop-blur-xs p-2 sm:p-4" onclick={() => isOpen = false}>
     <div 
-      class="w-full max-w-xl rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-2xl overflow-hidden flex flex-col max-h-[70vh]"
+      class="w-full max-w-xl rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[70vh]"
       onclick={(e) => e.stopPropagation()}
     >
       <!-- Search Input Bar -->

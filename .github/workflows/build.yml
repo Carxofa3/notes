@@ -200,16 +200,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG_NAME="v2.0.3"
-          TITLE="Notes Workstation v2.0.3 — Obsidian-Style Live Preview & Zero-Sample Clean Slate"
-          NOTES="### Notes Workstation v2.0.3 Release Packages
+          TAG_NAME="v2.0.4"
+          TITLE="Notes Workstation v2.0.4 — ChatGPT Codeboxes, Auto-Highlighting & Mobile UX"
+          NOTES="### Notes Workstation v2.0.4 Release Packages
           
-          This release introduces a unified Obsidian-style Live Preview editor, high-contrast text rendering, zero sample data, and direct course deletion:
-          - **Obsidian-Style Live Preview Editor**: Joined preview and plain text into a single unified workspace powered by CodeMirror 6 and live markdown rendering. Headings, bold/italic, tables, code blocks, and KaTeX math formulas render live in-place while remaining directly editable.
-          - **Crystal-Clear Text Visibility**: Full high-contrast input and caret rendering across all 5 themes (Catppuccin Mocha, Paper White Light, Solarized Dark, Cyberpunk, AMOLED), resolving Android WebView contrast and dark mode text issues.
-          - **Clean Zero-Sample Slate**: Removed all mock/starter courses, units, and notes. The app starts 100% clean and automatically purges legacy sample cache from localStorage.
-          - **Direct Course Deletion**: Added direct delete (\`🗑️\`) buttons to course tabs and cascade deletion for all associated folders and notes.
-          - **File Explorer & Customization**: Customizable folder/note icons and colors, smart auto-categorization, and persistent navigation drawer.
+          This release introduces sleek ChatGPT-style codeboxes with language auto-detection, comprehensive mobile responsiveness, and easy phone-to-PC connection:
+          - **ChatGPT-Style Codeboxes**: Re-engineered code block widgets with an Obsidian live-preview feel and ChatGPT aesthetic: dark slate container, top header bar displaying the language name, and an animated Copy Code button with clipboard/checkmark SVG feedback.
+          - **Language Auto-Detection & High-Contrast Syntax Highlighting**: Powered by \`lowlight\` (Highlight.js) supporting 35+ languages (Python, JS, TS, C++, Rust, Go, SQL, Bash, HTML/CSS, etc.) with automatic language detection when untagged and vibrant One Dark / Catppuccin Mocha syntax tokens.
+          - **Mobile Container Overflow Fixes**: Restructured top toolbar into 2 non-wrapping swipeable strips, made math palette and modal grids responsive to small phone screens, and adjusted Omnibox top margin to prevent mobile keyboard cutoff.
+          - **LAN / Tailscale Phone-to-PC Sync**: Flask backend now binds to \`0.0.0.0:5000\` for LAN/Tailscale access. Workstation Settings modal now includes quick Wi-Fi connection presets (\`http://192.168.0.45:5000\`) and an in-app setup guide.
+          - **Unified Live Editor**: In-place KaTeX math, tables, code blocks, and markdown notes all editable in live preview mode.
 
           #### Downloads:
           - **Android (Universal APK)**: \`Notes-Workstation-Android-Universal-v2.0.3.apk\`

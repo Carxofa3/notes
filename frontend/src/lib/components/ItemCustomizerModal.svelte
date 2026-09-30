@@ -47,12 +47,12 @@
 
 {#if isOpen && item}
   <div 
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4"
     onclick={() => isOpen = false}
     role="dialog"
   >
     <div 
-      class="w-full max-w-sm rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-2xl p-5 flex flex-col gap-4 text-[var(--text-primary)]"
+      class="w-full max-w-[95vw] sm:max-w-sm max-h-[90vh] overflow-y-auto rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-2xl p-4 sm:p-5 flex flex-col gap-3.5 text-[var(--text-primary)]"
       onclick={(e) => e.stopPropagation()}
     >
       <!-- Header -->
@@ -97,12 +97,12 @@
         </div>
       </div>
 
-      <!-- Color Picker -->
+      <!-- Color Picker (wraps gracefully across 2 rows on mobile) -->
       <div class="flex flex-col gap-1.5">
         <label class="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
           Color Tag
         </label>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2.5 max-w-full">
           {#each PRESET_COLORS as c}
             <button
               class="w-6 h-6 rounded-full border-2 transition-transform active:scale-90 {color === c.hex ? 'border-white scale-110 shadow-xs' : 'border-transparent'}"

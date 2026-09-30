@@ -150,13 +150,13 @@
   }
 </script>
 
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-  <div class="w-full max-w-4xl h-[85vh] rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-2xl p-6 flex flex-col gap-4">
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4">
+  <div class="w-full max-w-[95vw] sm:max-w-4xl max-h-[92vh] overflow-y-auto rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-2xl p-4 sm:p-6 flex flex-col gap-3.5">
     <!-- Header -->
-    <div class="flex items-center justify-between border-b border-[var(--border)] pb-3">
+    <div class="flex items-center justify-between border-b border-[var(--border)] pb-2.5">
       <div>
-        <h2 class="text-lg font-bold text-[var(--text-primary)]">2D Function Curve Plotter</h2>
-        <p class="text-xs text-[var(--text-secondary)]">Interactive calculus & physics curve visualization with dynamic parameter tuning</p>
+        <h2 class="text-base sm:text-lg font-bold text-[var(--text-primary)]">2D Function Curve Plotter</h2>
+        <p class="text-[11px] sm:text-xs text-[var(--text-secondary)]">Calculus & physics curve visualization with dynamic parameter tuning</p>
       </div>
       <button 
         class="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xl p-1"
@@ -164,12 +164,12 @@
       >&times;</button>
     </div>
 
-    <!-- Presets -->
-    <div class="flex gap-2 items-center text-xs text-[var(--text-secondary)]">
-      <span>Presets:</span>
+    <!-- Presets (Smooth swipe on mobile) -->
+    <div class="flex gap-1.5 items-center text-xs text-[var(--text-secondary)] overflow-x-auto no-scrollbar flex-nowrap shrink-0">
+      <span class="shrink-0 font-medium">Presets:</span>
       {#each PRESETS as p}
         <button
-          class="px-2.5 py-1 rounded-lg bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--text-primary)] font-medium"
+          class="shrink-0 px-2.5 py-1 rounded-lg bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--text-primary)] font-medium"
           onclick={() => { equation = p.eq; drawPlot(); }}
         >
           {p.name}

@@ -55,16 +55,16 @@
 </script>
 
 {#if isOpen}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4" onclick={() => isOpen = false}>
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-2 sm:p-4" onclick={() => isOpen = false}>
     <div 
-      class="w-full max-w-2xl max-h-[85vh] rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-2xl p-6 flex flex-col gap-4 overflow-hidden"
+      class="w-full max-w-2xl max-h-[90vh] sm:max-h-[85vh] rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-2xl p-4 sm:p-6 flex flex-col gap-3 sm:gap-4 overflow-hidden"
       onclick={(e) => e.stopPropagation()}
     >
       <!-- Header -->
-      <div class="flex items-center justify-between border-b border-[var(--border)] pb-3">
+      <div class="flex items-center justify-between border-b border-[var(--border)] pb-2.5">
         <div>
-          <h2 class="text-lg font-bold text-[var(--text-primary)]">Course Slide & Textbook Indexer (RAG)</h2>
-          <p class="text-xs text-[var(--text-secondary)]">All uploaded slides remain strictly private and local for offline lecture fact-checking</p>
+          <h2 class="text-base sm:text-lg font-bold text-[var(--text-primary)]">Course Slide & Textbook Indexer (RAG)</h2>
+          <p class="text-[11px] sm:text-xs text-[var(--text-secondary)]">All uploaded slides remain strictly private and local for offline lecture fact-checking</p>
         </div>
         <button 
           class="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xl p-1"
@@ -73,7 +73,7 @@
       </div>
 
       <!-- Upload Form -->
-      <form onsubmit={handleUpload} class="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] flex flex-col gap-3">
+      <form onsubmit={handleUpload} class="p-3 sm:p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] flex flex-col gap-2.5 sm:gap-3">
         <span class="text-xs font-semibold text-[var(--text-primary)]">Upload Lecture Deck (PDF)</span>
         
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -91,19 +91,19 @@
           />
         </div>
 
-        <div class="flex items-center gap-3">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
           <input
             bind:this={fileInput}
             type="file"
             accept=".pdf"
             required
-            class="text-xs text-[var(--text-secondary)] file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[var(--accent)] file:text-white hover:file:opacity-90 cursor-pointer"
+            class="text-xs text-[var(--text-secondary)] file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[var(--accent)] file:text-white hover:file:opacity-90 cursor-pointer min-w-0"
           />
 
           <button
             type="submit"
             disabled={isUploading}
-            class="ml-auto px-4 py-1.5 rounded-lg text-xs font-semibold bg-[var(--accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+            class="w-full sm:w-auto sm:ml-auto px-4 py-2 sm:py-1.5 rounded-lg text-xs font-semibold bg-[var(--accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-50 shrink-0"
           >
             {isUploading ? 'Indexing...' : 'Index Slide Deck'}
           </button>
@@ -125,12 +125,12 @@
           </div>
         {:else}
           {#each documents as doc}
-            <div class="p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] flex items-center justify-between text-xs">
-              <div class="flex flex-col gap-0.5">
-                <span class="font-semibold text-[var(--text-primary)]">{doc.title}</span>
+            <div class="p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs">
+              <div class="flex flex-col gap-0.5 min-w-0">
+                <span class="font-semibold text-[var(--text-primary)] truncate">{doc.title}</span>
                 <span class="text-[10px] text-[var(--text-secondary)]">{doc.course_name} • {doc.total_pages} slides • {doc.chunks_count} chunks</span>
               </div>
-              <span class="px-2 py-0.5 rounded text-[10px] bg-emerald-950/40 text-emerald-300 border border-emerald-500/30">Local RAG Ready</span>
+              <span class="px-2 py-0.5 rounded text-[10px] bg-emerald-950/40 text-emerald-300 border border-emerald-500/30 shrink-0 self-start sm:self-auto">Local RAG Ready</span>
             </div>
           {/each}
         {/if}

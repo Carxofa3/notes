@@ -17,10 +17,11 @@
     mathPlugin,
     blockMathField,
     tableField,
-    codeBlockField,
     imageField,
-    linkPlugin
+    linkPlugin,
+    initHighlighter
   } from 'codemirror-live-markdown';
+  import { chatGptCodeBlockField } from '../codeblock.js';
   import { synthesizeLectureNotes } from '../api.js';
 
   let {
@@ -99,7 +100,12 @@
     }
   });
 
-  onMount(() => {
+  onMount(async () => {
+    try {
+      await initHighlighter();
+    } catch (e) {
+      console.warn('Highlighter initialization error:', e);
+    }
     initCodeMirror();
   });
 
@@ -167,7 +173,7 @@
         mathPlugin,
         blockMathField,
         tableField,
-        codeBlockField({ copyButton: true }),
+        chatGptCodeBlockField(),
         imageField({ maxWidth: '100%' }),
         linkPlugin(),
         EditorView.updateListener.of((update) => {
@@ -317,31 +323,33 @@
 </script>
 
 <div class="h-full flex flex-col bg-[var(--bg-primary)] overflow-hidden">
-  <!-- Top Editor Header Toolbar -->
-  <div class="flex flex-wrap items-center justify-between p-3 border-b border-[var(--border)] bg-[var(--bg-secondary)] gap-2 shrink-0">
-    <!-- Note Title with explicit high-contrast text color & caret -->
-    <input
-      type="text"
-      bind:value={title}
-      oninput={handleTitleChange}
-      placeholder="Lecture Note Title..."
-      class="text-base font-bold bg-transparent text-[var(--text-primary)] placeholder-[var(--text-secondary)] focus:outline-hidden flex-1 min-w-[180px]"
-      style="color: var(--text-primary) !important; caret-color: var(--accent) !important;"
-    />
+  <!-- Top Editor Header Toolbar (Two clean, non-wrapping rows on mobile) -->
+  <div class="border-b border-[var(--border)] bg-[var(--bg-secondary)] px-3 py-1.5 flex flex-col gap-1.5 shrink-0">
+    <!-- Row 1: Note Title & Live Preview Toggle -->
+    <div class="flex items-center justify-between gap-2">
+      <input
+        type="text"
+        bind:value={title}
+        oninput={handleTitleChange}
+        placeholder="Lecture Note Title..."
+        class="text-sm sm:text-base font-bold bg-transparent text-[var(--text-primary)] placeholder-[var(--text-secondary)] focus:outline-hidden flex-1 min-w-0 truncate"
+        style="color: var(--text-primary) !important; caret-color: var(--accent) !important;"
+      />
 
-    <!-- Action Shortcuts & Obsidian Live Preview Toggle -->
-    <div class="flex items-center gap-1.5 flex-wrap">
       <!-- Obsidian Live Preview Toggle -->
       <button
-        class="px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 border shadow-xs {isLivePreview ? 'bg-[var(--accent)] text-white border-[var(--accent)]' : 'bg-[var(--card)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-[var(--border)]'}"
+        class="px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 border shadow-xs shrink-0 {isLivePreview ? 'bg-[var(--accent)] text-white border-[var(--accent)]' : 'bg-[var(--card)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-[var(--border)]'}"
         onclick={toggleLivePreview}
-        title="Toggle Obsidian Live Preview (WYSIWYG Markdown Rendering)"
+        title="Toggle Obsidian Live Preview"
       >
-        <span>{isLivePreview ? '✨ Live Preview' : '📝 Source Mode'}</span>
+        <span>{isLivePreview ? '✨ Live' : '📝 Source'}</span>
       </button>
+    </div>
 
-      <!-- Formatting Helpers -->
-      <div class="hidden sm:flex items-center gap-1 border-l border-r border-[var(--border)] px-1.5">
+    <!-- Row 2: Action Shortcuts (Horizontal Swipeable Strip with zero wrap) -->
+    <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 shrink-0">
+      <!-- Formatting Helpers (Desktop) -->
+      <div class="hidden sm:flex items-center gap-1 border-r border-[var(--border)] pr-1.5 shrink-0">
         <button
           class="px-2 py-0.5 rounded hover:bg-[var(--card)] font-bold text-xs text-[var(--text-primary)]"
           onclick={() => formatSelection('**', '**', 'bold')}
@@ -370,7 +378,7 @@
       </div>
 
       <button
-        class="px-2.5 py-1 rounded-lg text-xs font-medium bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--accent)] flex items-center gap-1 shadow-xs"
+        class="shrink-0 px-2 py-1 rounded-lg text-xs font-medium bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--accent)] flex items-center gap-1 shadow-xs"
         onclick={onOpenMath}
         title="Open Visual Formula Builder (Ctrl+E)"
       >
@@ -378,7 +386,7 @@
       </button>
 
       <button
-        class="px-2.5 py-1 rounded-lg text-xs font-medium bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--accent)] flex items-center gap-1 shadow-xs"
+        class="shrink-0 px-2 py-1 rounded-lg text-xs font-medium bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--accent)] flex items-center gap-1 shadow-xs"
         onclick={onOpenMermaid}
         title="Mermaid Diagrams (Ctrl+M)"
       >
@@ -386,7 +394,7 @@
       </button>
 
       <button
-        class="px-2.5 py-1 rounded-lg text-xs font-medium bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--accent)] flex items-center gap-1 shadow-xs"
+        class="shrink-0 px-2 py-1 rounded-lg text-xs font-medium bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--accent)] flex items-center gap-1 shadow-xs"
         onclick={onOpenCanvas}
         title="Stylus Drawing Canvas (Ctrl+D)"
       >
@@ -394,7 +402,7 @@
       </button>
 
       <button
-        class="px-2.5 py-1 rounded-lg text-xs font-medium bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--accent)] flex items-center gap-1 shadow-xs"
+        class="shrink-0 px-2 py-1 rounded-lg text-xs font-medium bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--accent)] flex items-center gap-1 shadow-xs"
         onclick={onOpenPlotter}
         title="2D Function Curve Plotter (Ctrl+P)"
       >
@@ -403,7 +411,7 @@
 
       <!-- AI Study Guide Synthesis -->
       <button
-        class="px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-950/40 hover:bg-indigo-900/50 border border-indigo-500/40 text-indigo-300 flex items-center gap-1 shadow-xs transition-colors"
+        class="shrink-0 px-2 py-1 rounded-lg text-xs font-medium bg-indigo-950/40 hover:bg-indigo-900/50 border border-indigo-500/40 text-indigo-300 flex items-center gap-1 shadow-xs transition-colors"
         onclick={handleSynthesizeStudyGuide}
         disabled={isSynthesizing}
         title="Synthesize Structured Study Guide with Formulas"
@@ -417,7 +425,7 @@
       </button>
 
       <button
-        class="px-2.5 py-1 rounded-lg text-xs font-medium bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--accent)] flex items-center gap-1 shadow-xs transition-colors"
+        class="shrink-0 px-2 py-1 rounded-lg text-xs font-medium bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--accent)] flex items-center gap-1 shadow-xs transition-colors"
         onclick={onAutoOrganize}
         title="Auto-organize note into smart folder & assign domain icon"
       >
@@ -425,7 +433,7 @@
       </button>
 
       <button
-        class="px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 shadow-sm transition-colors"
+        class="shrink-0 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-1.5 shadow-sm transition-colors"
         onclick={onFactCheck}
         title="Run Autonomous Fact-Checking (Ctrl+Shift+F)"
       >
@@ -442,8 +450,8 @@
     ></div>
   </div>
 
-  <!-- Status Bar Footer -->
-  <div class="px-3 py-1.5 border-t border-[var(--border)] bg-[var(--bg-secondary)] flex items-center justify-between text-[11px] text-[var(--text-secondary)] shrink-0">
+  <!-- Status Bar Footer (Desktop only; on mobile, FloatingAccessoryBar handles the bottom) -->
+  <div class="hidden sm:flex px-3 py-1.5 border-t border-[var(--border)] bg-[var(--bg-secondary)] items-center justify-between text-[11px] text-[var(--text-secondary)] shrink-0">
     <div class="flex items-center gap-3">
       <span class="flex items-center gap-1.5">
         <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>

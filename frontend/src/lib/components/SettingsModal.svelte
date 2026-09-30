@@ -80,9 +80,9 @@
         <div class="flex gap-2">
           <input
             type="text"
-            placeholder="e.g. http://192.168.1.15:5000 or http://100.x.y.z:5000"
+            placeholder="e.g. http://192.168.0.45:5000 or http://100.x.y.z:5000"
             bind:value={serverInput}
-            class="flex-1 px-3 py-2 text-xs rounded-xl bg-[var(--card)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--accent)]"
+            class="flex-1 px-3 py-2 text-xs rounded-xl bg-[var(--card)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--accent)] font-mono"
           />
           <button
             class="px-3 py-2 rounded-xl text-xs font-semibold bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--text-primary)] transition-colors shrink-0"
@@ -91,6 +91,39 @@
           >
             {isTesting ? 'Testing...' : 'Test Ping'}
           </button>
+        </div>
+
+        <!-- Quick Connection Presets -->
+        <div class="flex flex-wrap items-center gap-1.5 pt-1">
+          <span class="text-[11px] text-[var(--text-secondary)] font-medium mr-1">Quick Presets:</span>
+          <button
+            type="button"
+            class="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--accent)] transition-colors"
+            onclick={() => { serverInput = 'http://192.168.0.45:5000'; handleTest(); }}
+            title="Connect to PC on current home Wi-Fi"
+          >
+            📡 Home Wi-Fi (192.168.0.45:5000)
+          </button>
+          <button
+            type="button"
+            class="px-2.5 py-1 rounded-lg text-[11px] font-mono bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+            onclick={() => { serverInput = 'http://127.0.0.1:5000'; handleTest(); }}
+            title="Use localhost (for PC desktop app)"
+          >
+            💻 Localhost (127.0.0.1:5000)
+          </button>
+        </div>
+
+        <!-- Connection Instructions Card -->
+        <div class="p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] flex flex-col gap-1.5 text-xs text-[var(--text-secondary)]">
+          <span class="font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
+            <span>💡 How to connect phone to your computer:</span>
+          </span>
+          <ol class="list-decimal list-inside space-y-1 text-[11px] leading-relaxed">
+            <li>Ensure phone & PC are on the same Wi-Fi network (or both connected via Tailscale).</li>
+            <li>On your computer, run <code class="font-mono text-[var(--accent)] px-1 py-0.5 rounded bg-[var(--card)]">python main.py</code> in a terminal.</li>
+            <li>Tap <strong class="text-[var(--text-primary)]">Home Wi-Fi (192.168.0.45:5000)</strong> above, test the ping, then tap <strong class="text-[var(--text-primary)]">Save Configuration</strong>!</li>
+          </ol>
         </div>
 
         {#if pingResult}
