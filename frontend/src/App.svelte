@@ -23,6 +23,7 @@
   import SlideIngestionModal from './lib/components/SlideIngestionModal.svelte';
   import TailscalePairingModal from './lib/components/TailscalePairingModal.svelte';
   import FloatingAccessoryBar from './lib/components/FloatingAccessoryBar.svelte';
+  import SettingsModal from './lib/components/SettingsModal.svelte';
 
   // State
   let lessons = $state([]);
@@ -44,6 +45,7 @@
   let showFactCheck = $state(false);
   let showSlides = $state(false);
   let showPairing = $state(false);
+  let showSettings = $state(false);
 
   // Responsive Drawer toggle for mobile (<768px)
   let showMobileSidebar = $state(false);
@@ -120,24 +122,50 @@ $$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{C
   }
 
   async function handleCreateNewNote() {
-    if (!activeUnit) {
-      if (lessons.length === 0) {
-        const l = await createLesson('General Lecture');
-        lessons = [l];
-        activeLesson = l;
+    try {
+      if (!activeLesson) {
+        if (lessons.length > 0) {
+          activeLesson = lessons[0];
+        } else {
+          const l = await createLesson('General Lecture');
+          if (l) {
+            lessons = [l];
+            activeLesson = l;
+          }
+        }
       }
-      const u = await createUnit(activeLesson.id, 'Lecture Notes');
-      units = [u];
-      activeUnit = u;
-    }
 
-    const newNote = await createNote(activeUnit.id, {
-      title: 'New Lecture Note',
-      content: '# New Lecture Note\n\n'
-    });
-    if (newNote) {
-      notes = [newNote, ...notes];
-      activeNote = newNote;
+      if (!activeLesson) return;
+
+      if (!activeUnit) {
+        const uList = await fetchUnits(activeLesson.id);
+        if (uList && uList.length > 0) {
+          units = uList;
+          activeUnit = uList[0];
+        } else {
+          const u = await createUnit(activeLesson.id, 'Lecture Notes');
+          if (u) {
+            units = [u];
+            activeUnit = u;
+          }
+        }
+      }
+
+      if (!activeUnit) return;
+
+      const count = notes.length + 1;
+      const newNote = await createNote(activeUnit.id, {
+        title: `Lecture Note ${count}`,
+        content: `# Lecture Note ${count}\n\n`
+      });
+
+      if (newNote) {
+        notes = [newNote, ...notes];
+        activeNote = newNote;
+      }
+      showMobileSidebar = false;
+    } catch (err) {
+      console.error('Failed to create new note:', err);
     }
   }
 
@@ -223,7 +251,9 @@ $$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{C
 
 <div class="h-screen w-screen flex flex-col bg-[var(--bg-primary)] text-[var(--text-primary)] select-none overflow-hidden">
   <!-- Top App Navigation Bar -->
-  <header class="h-12 border-b border-[var(--border)] bg-[var(--bg-secondary)] flex items-center justify-between px-3 shrink-0">
+  <header 
+    class="border-b border-[var(--border)] bg-[var(--bg-secondary)] flex items-center justify-between px-3 shrink-0 pt-[max(env(safe-area-inset-top,0px),1.75rem)] sm:pt-2 pb-2 min-h-12 pl-[max(env(safe-area-inset-left,0px),0.75rem)] pr-[max(env(safe-area-inset-right,0px),0.75rem)]"
+  >
     <div class="flex items-center gap-2">
       <!-- Mobile Drawer Button (<768px) -->
       <button
@@ -242,11 +272,11 @@ $$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{C
 
     <!-- Center Omnibox Trigger Button -->
     <button
-      class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-xs text-[var(--text-secondary)] transition-colors shadow-xs"
+      class="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-xs text-[var(--text-secondary)] transition-colors shadow-xs truncate max-w-[140px] sm:max-w-xs"
       onclick={() => showOmnibox = true}
     >
-      <span>Search notes & tools...</span>
-      <kbd class="px-1.5 py-0.5 rounded bg-[var(--bg-secondary)] border border-[var(--border)] text-[10px] font-mono">Ctrl+K</kbd>
+      <span class="truncate">Search notes & tools...</span>
+      <kbd class="hidden sm:inline px-1.5 py-0.5 rounded bg-[var(--bg-secondary)] border border-[var(--border)] text-[10px] font-mono">Ctrl+K</kbd>
     </button>
 
     <!-- Top Right Action Controls -->
@@ -269,6 +299,15 @@ $$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{C
         <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
         <span class="hidden sm:inline">P2P Mesh</span>
       </button>
+
+      <!-- Settings button -->
+      <button
+        class="p-1.5 rounded-lg text-xs font-medium bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center justify-center shadow-xs"
+        onclick={() => showSettings = true}
+        title="Settings (Server IP, Theme, Offline Storage)"
+      >
+        <span>⚙️</span>
+      </button>
     </div>
   </header>
 
@@ -276,8 +315,17 @@ $$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{C
   <div class="flex-1 min-h-0 flex relative overflow-hidden">
     <!-- Sidebar: Lessons, Units & Notes List -->
     <aside
-      class="w-72 border-r border-[var(--border)] bg-[var(--bg-secondary)] flex flex-col shrink-0 transition-transform duration-200 z-30 absolute md:static inset-y-0 left-0 {showMobileSidebar ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}"
+      class="w-72 border-r border-[var(--border)] bg-[var(--bg-secondary)] flex flex-col shrink-0 transition-transform duration-200 z-30 absolute md:static inset-y-0 left-0 pt-[max(env(safe-area-inset-top,0px),1.75rem)] md:pt-0 pb-[max(env(safe-area-inset-bottom,0px),1rem)] md:pb-0 {showMobileSidebar ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'}"
     >
+      <!-- Mobile Drawer Close Header (Mobile Only) -->
+      <div class="md:hidden px-3 py-2 border-b border-[var(--border)] flex items-center justify-between bg-[var(--bg-tertiary)]">
+        <span class="text-xs font-bold text-[var(--text-primary)]">Courses & Units</span>
+        <button
+          class="p-1 px-2 rounded-lg bg-[var(--card)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border)]"
+          onclick={() => showMobileSidebar = false}
+        >✕ Close</button>
+      </div>
+
       <!-- Lessons Selector -->
       <div class="p-3 border-b border-[var(--border)] flex flex-col gap-2">
         <div class="flex items-center justify-between text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
@@ -430,6 +478,54 @@ $$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{C
     </main>
   </div>
 
+  <!-- Mobile Bottom Navigation Bar (sm:hidden) -->
+  <nav class="sm:hidden border-t border-[var(--border)] bg-[var(--bg-secondary)] flex items-center justify-around px-2 pt-1.5 pb-[max(env(safe-area-inset-bottom,0px),1rem)] z-20 shrink-0">
+    <!-- Courses Drawer -->
+    <button
+      class="flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl text-[10px] font-medium transition-colors {showMobileSidebar ? 'text-[var(--accent)] font-bold' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}"
+      onclick={() => showMobileSidebar = !showMobileSidebar}
+    >
+      <span class="text-base leading-none">📚</span>
+      <span>Courses</span>
+    </button>
+
+    <!-- Editor Tab -->
+    <button
+      class="flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl text-[10px] font-medium transition-colors {!showMobileSidebar ? 'text-[var(--accent)] font-bold' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}"
+      onclick={() => showMobileSidebar = false}
+    >
+      <span class="text-base leading-none">✏️</span>
+      <span>Editor</span>
+    </button>
+
+    <!-- + New Note (Primary Action) -->
+    <button
+      class="flex flex-col items-center gap-0.5 py-1 px-3.5 rounded-2xl bg-[var(--accent)] text-white text-[10px] font-bold shadow-md active:scale-95 transition-transform"
+      onclick={handleCreateNewNote}
+    >
+      <span class="text-base leading-none font-bold">➕</span>
+      <span>New Note</span>
+    </button>
+
+    <!-- Search / Tools -->
+    <button
+      class="flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl text-[10px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+      onclick={() => showOmnibox = true}
+    >
+      <span class="text-base leading-none">🔍</span>
+      <span>Search</span>
+    </button>
+
+    <!-- Settings Tab -->
+    <button
+      class="flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl text-[10px] font-medium transition-colors {showSettings ? 'text-[var(--accent)] font-bold' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}"
+      onclick={() => showSettings = true}
+    >
+      <span class="text-base leading-none">⚙️</span>
+      <span>Settings</span>
+    </button>
+  </nav>
+
   <!-- Interactive Modals & Studios -->
   <Omnibox
     bind:isOpen={showOmnibox}
@@ -486,5 +582,9 @@ $$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{C
 
   <TailscalePairingModal
     bind:isOpen={showPairing}
+  />
+
+  <SettingsModal
+    bind:isOpen={showSettings}
   />
 </div>
