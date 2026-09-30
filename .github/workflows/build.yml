@@ -200,20 +200,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG_NAME="v2.0.5"
-          TITLE="Notes Workstation v2.0.5 — Fix PC White Screen & Relative Asset Resolution"
-          NOTES="### Notes Workstation v2.0.5 Release Packages
+          TAG_NAME="v2.0.6"
+          TITLE="Notes Workstation v2.0.6 — High-Contrast Pairing QR Code & Wi-Fi Scan Mode"
+          NOTES="### Notes Workstation v2.0.6 Release Packages
           
-          This release fixes the desktop white-screen issue on Windows & Linux and ensures robust asset loading:
-          - **Fix PC White Screen (Asset Path Resolution)**: Configured Vite with \`base: './'\` (relative paths) so all HTML, JS, CSS, and font assets load properly through Tauri's internal protocol on desktop, eliminating the blank white screen caused by root-relative paths.
-          - **Service Worker & Cache Poisoning Purge**: Removed aggressive service worker caching that was serving stale HTML referencing deleted bundles, and added auto-cleanup that actively unregisters legacy service workers and clears CacheStorage.
-          - **Default Dark Window Canvas**: Added inline \`background-color: #1e1e2e\` to \`index.html\` so the window canvas matches the dark theme from the very first frame without any white flash.
-          - **Desktop Developer Tools Enabled**: Integrated the \`devtools\` feature into release builds for desktop inspection (\`Ctrl+Shift+I\` or right-click Inspect).
-          - **ChatGPT-Style Codeboxes & Syntax Auto-Highlighting**: Dark slate container, language badge header bar, animated Copy Code button with checkmark feedback, and 35+ languages supported via \`lowlight\`.
-          - **Mobile UI & Responsive Toolbar**: 2-row swipeable action bar, non-overlapping modals, and keyboard-safe Omnibox.
+          This release fixes the blank QR code issue and introduces instant Wi-Fi phone-to-PC pairing:
+          - **Fix Blank White Pairing QR Code**: Replaced timing-sensitive DOM canvas rendering with reactive high-resolution \`QRCode.toDataURL\` image rendering. Guarantees an immediate, sharp QR code even if backend is offline or starting up.
+          - **Dual Pairing Modes**:
+            - 📡 **Wi-Fi Quick Connect**: Encodes the direct LAN IP address (\`http://192.168.0.45:5000\`), easily scannable by any standard phone camera or mobile Notes app to connect immediately.
+            - 🔒 **Tailscale P2P Mesh**: Encodes mTLS cryptographic fingerprints and MagicDNS node tokens for decentralized synchronization.
+          - **One-Click Connection URL Copy**: Added a one-click copy button with animated feedback so you can easily copy and paste the connection string.
+          - **Fix PC White Screen & Asset Resolution**: Configured Vite with \`base: './'\` (relative paths) for desktop Tauri WebView2.
+          - **ChatGPT-Style Codeboxes & Syntax Auto-Highlighting**: Dark slate container, language badge header, and animated Copy Code button.
 
           #### Downloads:
-          - **Android (Universal APK)**: \`Notes-Workstation-Android-Universal-v0.2.4.apk\`
+          - **Android (Universal APK)**: \`Notes-Workstation-Android-Universal-v0.2.5.apk\`
           - **Windows Desktop**: \`*.exe\`, \`*.msi\`, \`install.ps1\`
           - **Linux**: \`*.deb\`, \`*.AppImage\`, \`install.sh\`"
             
