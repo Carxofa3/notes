@@ -128,7 +128,7 @@ jobs:
           export ANDROID_HOME="/usr/local/lib/android/sdk"
           export NDK_HOME="/usr/local/lib/android/sdk/ndk/26.1.10909125"
           npx tauri android init --ci
-          npx tauri android build --apk --target aarch64-linux-android
+          npx tauri android build --apk --target aarch64
       - name: Find and Prepare APK
         run: |
           mkdir -p release-apk
