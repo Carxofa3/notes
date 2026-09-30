@@ -145,26 +145,29 @@ jobs:
           UNSIGNED_APK=$(find src-tauri/gen/android/ -name "*universal-release-unsigned.apk" -o -name "*release-unsigned.apk" | head -n 1)
           echo "Found unsigned APK: $UNSIGNED_APK"
           
+          APP_VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          
           # Align 4-byte boundaries
           $BUILD_TOOLS_DIR/zipalign -v -p 4 "$UNSIGNED_APK" aligned.apk
           
           # Sign with v1, v2, v3 signature schemes
-          $BUILD_TOOLS_DIR/apksigner sign --ks release.keystore --ks-pass pass:notes1234 --key-pass pass:notes1234 --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true --out release-apk/Notes-Workstation-Android-Universal-v2.0.1.apk aligned.apk
+          $BUILD_TOOLS_DIR/apksigner sign --ks release.keystore --ks-pass pass:notes1234 --key-pass pass:notes1234 --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true --out release-apk/Notes-Workstation-Android-Universal-v${APP_VERSION}.apk aligned.apk
           
           # Verify signature
-          $BUILD_TOOLS_DIR/apksigner verify -v release-apk/Notes-Workstation-Android-Universal-v2.0.1.apk
+          $BUILD_TOOLS_DIR/apksigner verify -v release-apk/Notes-Workstation-Android-Universal-v${APP_VERSION}.apk
           
           # Also copy as default APK name
-          cp release-apk/Notes-Workstation-Android-Universal-v2.0.1.apk release-apk/Notes-Workstation-Android-v2.0.1.apk
+          cp release-apk/Notes-Workstation-Android-Universal-v${APP_VERSION}.apk release-apk/Notes-Workstation-Android-v${APP_VERSION}.apk
 
       - name: Build Android Debug APK (Pre-signed Fallback)
         run: |
+          APP_VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
           export ANDROID_HOME="/usr/local/lib/android/sdk"
           export NDK_HOME="/usr/local/lib/android/sdk/ndk/26.1.10909125"
           npx tauri android build --apk --debug --target aarch64
           DEBUG_APK=$(find src-tauri/gen/android/ -name "*debug.apk" | head -n 1)
           echo "Found debug APK: $DEBUG_APK"
-          cp "$DEBUG_APK" release-apk/Notes-Workstation-Android-Debug-v2.0.1.apk
+          cp "$DEBUG_APK" release-apk/Notes-Workstation-Android-Debug-v${APP_VERSION}.apk
           ls -lh release-apk/
 
       - name: Upload Android APKs
