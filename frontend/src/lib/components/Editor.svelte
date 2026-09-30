@@ -2,10 +2,25 @@
   import { onMount, onDestroy } from 'svelte';
   import katex from 'katex';
   import 'katex/dist/katex.min.css';
-  import * as Y from 'yjs';
-  import { Editor } from '@tiptap/core';
-  import StarterKit from '@tiptap/starter-kit';
-  import Placeholder from '@tiptap/extension-placeholder';
+  import { EditorState, Compartment } from '@codemirror/state';
+  import { EditorView, keymap, highlightActiveLine, placeholder } from '@codemirror/view';
+  import { defaultKeymap, history, historyKeymap, undo, redo } from '@codemirror/commands';
+  import { markdown } from '@codemirror/lang-markdown';
+  import { Table } from '@lezer/markdown';
+  import {
+    livePreviewPlugin,
+    markdownStylePlugin,
+    editorTheme,
+    mouseSelectingField,
+    collapseOnSelectionFacet,
+    setMouseSelecting,
+    mathPlugin,
+    blockMathField,
+    tableField,
+    codeBlockField,
+    imageField,
+    linkPlugin
+  } from 'codemirror-live-markdown';
   import { synthesizeLectureNotes } from '../api.js';
 
   let {
@@ -21,192 +36,268 @@
 
   let title = $state('');
   let content = $state('');
+  let isLivePreview = $state(true);
   let isSaving = $state(false);
   let isSynthesizing = $state(false);
+  let wordCount = $state(0);
+  let charCount = $state(0);
+
+  let editorContainer = $state(null);
+  let editorView = null;
+  const livePreviewCompartment = new Compartment();
+  let currentNoteId = null;
   let saveTimer = null;
-  let syncStatus = $state('Local-first (CRDT ready)');
-  let editorMode = $state('markdown'); // 'markdown' | 'tiptap'
 
-  // TipTap element & instance
-  let editorElement = $state(null);
-  let editorInstance = null;
-
-  // Yjs CRDT & WebSocket P2P State
-  let ydoc = null;
-  let ytext = null;
-  let ws = null;
-  let isRemoteSync = false;
-
-  $effect(() => {
-    if (note) {
-      title = note.title || '';
-      content = note.content || '';
-      setupYjsSync(note.id);
-      if (editorInstance && !editorInstance.isDestroyed) {
-        editorInstance.commands.setContent(formatMarkdownToHtml(content), false);
-      }
+  function updateCounts(text) {
+    if (!text) {
+      wordCount = 0;
+      charCount = 0;
+      return;
     }
-  });
-
-  $effect(() => {
-    if (editorMode === 'tiptap') {
-      setTimeout(initTipTap, 50);
-    }
-  });
-
-  onMount(() => {
-    if (editorMode === 'tiptap') {
-      initTipTap();
-    }
-  });
-
-  onDestroy(() => {
-    if (ws) {
-      try { ws.close(); } catch (_) {}
-    }
-    if (editorInstance) {
-      editorInstance.destroy();
-      editorInstance = null;
-    }
-  });
-
-  function setupYjsSync(noteId) {
-    if (!noteId) return;
-
-    if (ws) {
-      try { ws.close(); } catch (_) {}
-    }
-
-    ydoc = new Y.Doc();
-    ytext = ydoc.getText('note-content');
-
-    if (content && ytext.length === 0) {
-      ydoc.transact(() => {
-        ytext.insert(0, content);
-      }, 'init');
-    }
-
-    // Broadcast local CRDT deltas over Tailscale WebSocket
-    ydoc.on('update', (update, origin) => {
-      if (origin !== 'remote' && ws && ws.readyState === WebSocket.OPEN) {
-        const msg = new Uint8Array(1 + update.length);
-        msg[0] = 1; // Message type 1: CRDT update delta
-        msg.set(update, 1);
-        ws.send(msg);
-      }
-    });
-
-    try {
-      const wsUrl = `ws://${window.location.hostname || '127.0.0.1'}:58855/note-${noteId}`;
-      ws = new WebSocket(wsUrl);
-      ws.binaryType = 'arraybuffer';
-
-      ws.onopen = () => {
-        syncStatus = 'P2P Tailscale Connected (0.0.0.0:58855)';
-        // Step 1: Send client state vector to server
-        const sv = Y.encodeStateVector(ydoc);
-        const msg = new Uint8Array(1 + sv.length);
-        msg[0] = 0; // Message type 0: state vector
-        msg.set(sv, 1);
-        ws.send(msg);
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const buf = new Uint8Array(event.data);
-          if (buf.length === 0) return;
-          const msgType = buf[0];
-          const payload = buf.subarray(1);
-
-          if (msgType === 0) {
-            // Server sent state vector -> reply with missing update
-            const diff = Y.encodeStateAsUpdate(ydoc, payload);
-            if (diff.length > 0) {
-              const reply = new Uint8Array(1 + diff.length);
-              reply[0] = 1;
-              reply.set(diff, 1);
-              ws.send(reply);
-            }
-          } else if (msgType === 1) {
-            // Server or peer sent CRDT delta -> apply to doc
-            isRemoteSync = true;
-            Y.applyUpdate(ydoc, payload, 'remote');
-            const updated = ytext.toString();
-            if (updated && updated !== content) {
-              content = updated;
-              if (editorInstance && !editorInstance.isDestroyed) {
-                editorInstance.commands.setContent(formatMarkdownToHtml(content), false);
-              }
-              onSave({ title, content });
-            }
-            isRemoteSync = false;
-          }
-        } catch (err) {
-          console.error('[CRDT WS] Delta processing error:', err);
-        }
-      };
-
-      ws.onclose = () => {
-        syncStatus = 'Local-only (P2P mesh standby)';
-      };
-
-      ws.onerror = () => {
-        syncStatus = 'Local-first offline mode';
-      };
-    } catch (_) {
-      syncStatus = 'Local-first offline mode';
-    }
+    charCount = text.length;
+    wordCount = text.trim().split(/\s+/).filter(Boolean).length;
   }
 
-  function initTipTap() {
-    if (!editorElement || editorInstance) return;
-    try {
-      editorInstance = new Editor({
-        element: editorElement,
-        extensions: [
-          StarterKit,
-          Placeholder.configure({
-            placeholder: 'Type rich lecture notes here with headings, lists, bold, and code blocks...'
-          })
-        ],
-        content: formatMarkdownToHtml(content),
-        onUpdate: ({ editor }) => {
-          if (!isRemoteSync) {
-            content = htmlToMarkdown(editor.getHTML());
-            handleContentChange();
-          }
-        }
-      });
-    } catch (e) {
-      console.error('Failed to initialize TipTap:', e);
-    }
-  }
-
-  function handleContentChange() {
-    if (!isRemoteSync && ydoc && ytext) {
-      const currentY = ytext.toString();
-      if (currentY !== content) {
-        ydoc.transact(() => {
-          ytext.delete(0, ytext.length);
-          ytext.insert(0, content);
-        }, 'local');
-      }
-    }
-
+  function triggerSave() {
     clearTimeout(saveTimer);
     isSaving = true;
     saveTimer = setTimeout(() => {
       onSave({ title, content });
       isSaving = false;
-    }, 1200);
+    }, 1000);
+  }
+
+  function handleTitleChange() {
+    triggerSave();
+  }
+
+  // Reactive effect when active note changes
+  $effect(() => {
+    if (note && note.id !== currentNoteId) {
+      currentNoteId = note.id;
+      title = note.title || '';
+      content = note.content || '';
+      updateCounts(content);
+      if (editorView) {
+        const curDoc = editorView.state.doc.toString();
+        if (curDoc !== content) {
+          editorView.dispatch({
+            changes: { from: 0, to: curDoc.length, insert: content }
+          });
+        }
+      }
+    } else if (!note) {
+      currentNoteId = null;
+      title = '';
+      content = '';
+      updateCounts('');
+      if (editorView) {
+        editorView.dispatch({
+          changes: { from: 0, to: editorView.state.doc.length, insert: '' }
+        });
+      }
+    }
+  });
+
+  onMount(() => {
+    initCodeMirror();
+  });
+
+  onDestroy(() => {
+    clearTimeout(saveTimer);
+    if (editorView) {
+      editorView.destroy();
+      editorView = null;
+    }
+  });
+
+  function initCodeMirror() {
+    if (!editorContainer || editorView) return;
+
+    const baseTheme = EditorView.theme({
+      '&': {
+        height: '100%',
+        backgroundColor: 'transparent',
+        color: 'var(--text-primary)',
+        fontSize: '15px'
+      },
+      '.cm-scroller': {
+        overflow: 'auto',
+        fontFamily: 'inherit',
+        lineHeight: '1.7'
+      },
+      '.cm-content': {
+        caretColor: 'var(--accent)',
+        color: 'var(--text-primary)',
+        padding: '1.5rem 1.25rem 8rem 1.25rem',
+        maxWidth: '880px',
+        margin: '0 auto',
+        minHeight: '100%'
+      },
+      '.cm-line': {
+        color: 'var(--text-primary)'
+      },
+      '.cm-cursor, .cm-dropCursor': {
+        borderLeftColor: 'var(--accent)',
+        borderLeftWidth: '2.5px'
+      },
+      '&.cm-focused': {
+        outline: 'none'
+      },
+      '.cm-activeLine': {
+        backgroundColor: 'rgba(255, 255, 255, 0.03)'
+      }
+    });
+
+    const startState = EditorState.create({
+      doc: content,
+      extensions: [
+        history(),
+        highlightActiveLine(),
+        EditorView.lineWrapping,
+        placeholder('Start typing your lecture note... (Markdown, $inline math$, $$block math$$, tables, code blocks)'),
+        keymap.of([...defaultKeymap, ...historyKeymap]),
+        markdown({ extensions: [Table] }),
+        livePreviewCompartment.of(collapseOnSelectionFacet.of(isLivePreview)),
+        mouseSelectingField,
+        livePreviewPlugin,
+        markdownStylePlugin,
+        editorTheme,
+        baseTheme,
+        mathPlugin,
+        blockMathField,
+        tableField,
+        codeBlockField({ copyButton: true }),
+        imageField({ maxWidth: '100%' }),
+        linkPlugin(),
+        EditorView.updateListener.of((update) => {
+          if (update.docChanged) {
+            content = update.state.doc.toString();
+            updateCounts(content);
+            triggerSave();
+          }
+        })
+      ]
+    });
+
+    editorView = new EditorView({
+      state: startState,
+      parent: editorContainer
+    });
+
+    // Required selection state handlers for codemirror-live-markdown
+    editorView.contentDOM.addEventListener('mousedown', () => {
+      editorView?.dispatch({ effects: setMouseSelecting.of(true) });
+    });
+    const handleMouseUp = () => {
+      requestAnimationFrame(() => {
+        if (editorView && !editorView.isDestroyed) {
+          editorView.dispatch({ effects: setMouseSelecting.of(false) });
+        }
+      });
+    };
+    document.addEventListener('mouseup', handleMouseUp);
+
+    // Touch selection support for Android/iOS
+    editorView.contentDOM.addEventListener('touchstart', () => {
+      editorView?.dispatch({ effects: setMouseSelecting.of(true) });
+    }, { passive: true });
+    const handleTouchEnd = () => {
+      requestAnimationFrame(() => {
+        if (editorView && !editorView.isDestroyed) {
+          editorView.dispatch({ effects: setMouseSelecting.of(false) });
+        }
+      });
+    };
+    document.addEventListener('touchend', handleTouchEnd, { passive: true });
+  }
+
+  export function toggleLivePreview() {
+    isLivePreview = !isLivePreview;
+    if (editorView) {
+      editorView.dispatch({
+        effects: livePreviewCompartment.reconfigure(collapseOnSelectionFacet.of(isLivePreview))
+      });
+    }
   }
 
   export function insertText(snippet) {
-    content += snippet;
-    if (editorInstance && !editorInstance.isDestroyed) {
-      editorInstance.commands.setContent(formatMarkdownToHtml(content), false);
+    if (editorView) {
+      const mainSel = editorView.state.selection.main;
+      const transaction = editorView.state.update({
+        changes: {
+          from: mainSel.from,
+          to: mainSel.to,
+          insert: snippet
+        },
+        selection: {
+          anchor: mainSel.from + snippet.length
+        },
+        scrollIntoView: true
+      });
+      editorView.dispatch(transaction);
+      editorView.focus();
+    } else {
+      content += snippet;
+      updateCounts(content);
+      triggerSave();
     }
-    handleContentChange();
+  }
+
+  export function setContent(newContent) {
+    content = newContent || '';
+    updateCounts(content);
+    if (editorView) {
+      const curDoc = editorView.state.doc.toString();
+      if (curDoc !== content) {
+        editorView.dispatch({
+          changes: { from: 0, to: curDoc.length, insert: content }
+        });
+      }
+    }
+    triggerSave();
+  }
+
+  export function undoAction() {
+    if (editorView) {
+      undo(editorView);
+      editorView.focus();
+    }
+  }
+
+  export function redoAction() {
+    if (editorView) {
+      redo(editorView);
+      editorView.focus();
+    }
+  }
+
+  function formatSelection(prefix, suffix = prefix, defaultPlaceholder = '') {
+    if (!editorView) return;
+    const mainSel = editorView.state.selection.main;
+    const selectedText = editorView.state.sliceDoc(mainSel.from, mainSel.to);
+    const textToInsert = selectedText ? `${prefix}${selectedText}${suffix}` : `${prefix}${defaultPlaceholder}${suffix}`;
+    const insertPos = mainSel.from + prefix.length;
+    const selectEnd = selectedText ? insertPos + selectedText.length : insertPos + defaultPlaceholder.length;
+
+    editorView.dispatch({
+      changes: { from: mainSel.from, to: mainSel.to, insert: textToInsert },
+      selection: { anchor: insertPos, head: selectEnd },
+      scrollIntoView: true
+    });
+    editorView.focus();
+  }
+
+  function formatLinePrefix(prefix) {
+    if (!editorView) return;
+    const mainSel = editorView.state.selection.main;
+    const line = editorView.state.doc.lineAt(mainSel.from);
+    editorView.dispatch({
+      changes: { from: line.from, to: line.from, insert: prefix },
+      selection: { anchor: mainSel.from + prefix.length },
+      scrollIntoView: true
+    });
+    editorView.focus();
   }
 
   async function handleSynthesizeStudyGuide() {
@@ -215,11 +306,7 @@
     try {
       const res = await synthesizeLectureNotes(content);
       if (res && res.synthesized_content) {
-        content += `\n\n## 🎓 AI Lecture Study Guide & Key Formulas\n${res.synthesized_content}\n`;
-        if (editorInstance && !editorInstance.isDestroyed) {
-          editorInstance.commands.setContent(formatMarkdownToHtml(content), false);
-        }
-        handleContentChange();
+        insertText(`\n\n## 🎓 AI Lecture Study Guide & Key Formulas\n${res.synthesized_content}\n`);
       }
     } catch (e) {
       console.error('Study guide synthesis failed:', e);
@@ -227,113 +314,59 @@
       isSynthesizing = false;
     }
   }
-
-  function formatMarkdownToHtml(md) {
-    if (!md) return '<p></p>';
-    return md
-      .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-      .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-      .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-      .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/gim, '<em>$1</em>')
-      .replace(/`([^`]+)`/gim, '<code>$1</code>')
-      .replace(/\n\n/g, '<p></p>')
-      .replace(/\n/g, '<br/>');
-  }
-
-  function htmlToMarkdown(html) {
-    if (!html) return '';
-    let text = html
-      .replace(/<h1>(.*?)<\/h1>/gi, '# $1\n\n')
-      .replace(/<h2>(.*?)<\/h2>/gi, '## $1\n\n')
-      .replace(/<h3>(.*?)<\/h3>/gi, '### $1\n\n')
-      .replace(/<strong>(.*?)<\/strong>/gi, '**$1**')
-      .replace(/<b>(.*?)<\/b>/gi, '**$1**')
-      .replace(/<em>(.*?)<\/em>/gi, '*$1*')
-      .replace(/<i>(.*?)<\/i>/gi, '*$1*')
-      .replace(/<code>(.*?)<\/code>/gi, '`$1`')
-      .replace(/<li>(.*?)<\/li>/gi, '- $1\n')
-      .replace(/<p>(.*?)<\/p>/gi, '$1\n\n')
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<[^>]+>/g, '');
-    return text.trim();
-  }
-
-  // Render live Markdown preview with KaTeX equations
-  let renderedPreview = $derived.by(() => {
-    if (!content) return '<p class="text-[var(--text-secondary)] italic">Start typing your lecture notes or insert math & diagrams...</p>';
-
-    let text = content;
-
-    // 1. Block math: $$ ... $$
-    text = text.replace(/\$\$([\s\S]+?)\$\$/g, (match, formula) => {
-      try {
-        return `<div class="my-4 py-2 px-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] overflow-x-auto text-center">${katex.renderToString(formula, { displayMode: true, throwOnError: false })}</div>`;
-      } catch {
-        return match;
-      }
-    });
-
-    // 2. Inline math: $ ... $
-    text = text.replace(/\$([^\$\n]+?)\$/g, (match, formula) => {
-      try {
-        return `<span class="px-1 py-0.5 rounded bg-[var(--bg-secondary)] text-[var(--accent)] font-serif">${katex.renderToString(formula, { displayMode: false, throwOnError: false })}</span>`;
-      } catch {
-        return match;
-      }
-    });
-
-    // 3. Inline Fact-check annotations
-    text = text.replace(/\[🟢 Verified: (.*?)\]/g, '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-950/60 text-emerald-300 border border-emerald-500/50">🟢 Verified: $1</span>');
-    text = text.replace(/\[🔴 Disputed: (.*?)\]/g, '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-950/60 text-rose-300 border border-rose-500/50">🔴 Disputed: $1</span>');
-
-    // Basic markdown formatting
-    text = text
-      .replace(/^### (.*$)/gim, '<h3 class="text-base font-bold text-[var(--text-primary)] mt-3 mb-1">$1</h3>')
-      .replace(/^## (.*$)/gim, '<h2 class="text-lg font-bold text-[var(--text-primary)] mt-4 mb-2">$1</h2>')
-      .replace(/^# (.*$)/gim, '<h1 class="text-xl font-extrabold text-[var(--accent)] mt-5 mb-2">$1</h1>')
-      .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/gim, '<em>$1</em>')
-      .replace(/!\[(.*?)\]\((.*?)\)/gim, '<img alt="$1" src="$2" class="max-w-full rounded-xl border border-[var(--border)] my-3 shadow-md" />')
-      .replace(/\n/gim, '<br/>');
-
-    return text;
-  });
-
-  let wordCount = $derived(content ? content.trim().split(/\s+/).filter(Boolean).length : 0);
-  let charCount = $derived(content ? content.length : 0);
 </script>
 
 <div class="h-full flex flex-col bg-[var(--bg-primary)] overflow-hidden">
-  <!-- Top Editor Toolbar -->
-  <div class="flex flex-wrap items-center justify-between p-3 border-b border-[var(--border)] bg-[var(--bg-secondary)] gap-2">
-    <!-- Title Input -->
+  <!-- Top Editor Header Toolbar -->
+  <div class="flex flex-wrap items-center justify-between p-3 border-b border-[var(--border)] bg-[var(--bg-secondary)] gap-2 shrink-0">
+    <!-- Note Title with explicit high-contrast text color & caret -->
     <input
       type="text"
       bind:value={title}
-      oninput={handleContentChange}
+      oninput={handleTitleChange}
       placeholder="Lecture Note Title..."
       class="text-base font-bold bg-transparent text-[var(--text-primary)] placeholder-[var(--text-secondary)] focus:outline-hidden flex-1 min-w-[180px]"
+      style="color: var(--text-primary) !important; caret-color: var(--accent) !important;"
     />
 
-    <!-- Editor Mode Toggle & Action Shortcuts -->
+    <!-- Action Shortcuts & Obsidian Live Preview Toggle -->
     <div class="flex items-center gap-1.5 flex-wrap">
-      <!-- Mode Toggle: TipTap vs Dual-Pane Markdown -->
-      <div class="flex rounded-lg bg-[var(--bg-tertiary)] p-0.5 border border-[var(--border)]">
+      <!-- Obsidian Live Preview Toggle -->
+      <button
+        class="px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 border shadow-xs {isLivePreview ? 'bg-[var(--accent)] text-white border-[var(--accent)]' : 'bg-[var(--card)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-[var(--border)]'}"
+        onclick={toggleLivePreview}
+        title="Toggle Obsidian Live Preview (WYSIWYG Markdown Rendering)"
+      >
+        <span>{isLivePreview ? '✨ Live Preview' : '📝 Source Mode'}</span>
+      </button>
+
+      <!-- Formatting Helpers -->
+      <div class="hidden sm:flex items-center gap-1 border-l border-r border-[var(--border)] px-1.5">
         <button
-          class="px-2 py-1 rounded-md text-xs font-semibold transition-colors {editorMode === 'markdown' ? 'bg-[var(--accent)] text-white shadow-xs' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}"
-          onclick={() => editorMode = 'markdown'}
-          title="Markdown & KaTeX Split Preview Mode"
-        >
-          MD + KaTeX
-        </button>
+          class="px-2 py-0.5 rounded hover:bg-[var(--card)] font-bold text-xs text-[var(--text-primary)]"
+          onclick={() => formatSelection('**', '**', 'bold')}
+          title="Bold (Ctrl+B)"
+        >B</button>
         <button
-          class="px-2 py-1 rounded-md text-xs font-semibold transition-colors {editorMode === 'tiptap' ? 'bg-[var(--accent)] text-white shadow-xs' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}"
-          onclick={() => { editorMode = 'tiptap'; setTimeout(initTipTap, 50); }}
-          title="TipTap ProseMirror Rich Visual Editor"
-        >
-          TipTap Rich
-        </button>
+          class="px-2 py-0.5 rounded hover:bg-[var(--card)] italic text-xs text-[var(--text-primary)]"
+          onclick={() => formatSelection('*', '*', 'italic')}
+          title="Italic (Ctrl+I)"
+        >I</button>
+        <button
+          class="px-2 py-0.5 rounded hover:bg-[var(--card)] font-semibold text-xs text-[var(--text-primary)]"
+          onclick={() => formatLinePrefix('## ')}
+          title="Heading 2"
+        >H2</button>
+        <button
+          class="px-2 py-0.5 rounded hover:bg-[var(--card)] text-xs text-[var(--text-primary)]"
+          onclick={() => formatLinePrefix('- ')}
+          title="Bullet List"
+        >• List</button>
+        <button
+          class="px-2 py-0.5 rounded hover:bg-[var(--card)] text-xs text-[var(--text-primary)]"
+          onclick={() => formatLinePrefix('- [ ] ')}
+          title="Task Checkbox"
+        >[ ]</button>
       </div>
 
       <button
@@ -368,7 +401,7 @@
         <span>📈 Plot</span>
       </button>
 
-      <!-- Heavy LLM Synthesis Button -->
+      <!-- AI Study Guide Synthesis -->
       <button
         class="px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-950/40 hover:bg-indigo-900/50 border border-indigo-500/40 text-indigo-300 flex items-center gap-1 shadow-xs transition-colors"
         onclick={handleSynthesizeStudyGuide}
@@ -401,91 +434,20 @@
     </div>
   </div>
 
-  <!-- TipTap Sub-Toolbar (When in TipTap Rich Mode) -->
-  {#if editorMode === 'tiptap'}
-    <div class="px-3 py-1.5 border-b border-[var(--border)] bg-[var(--bg-tertiary)] flex items-center gap-1 flex-wrap text-xs">
-      <button
-        class="px-2 py-0.5 rounded hover:bg-[var(--card)] font-bold {editorInstance?.isActive('bold') ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-primary)]'}"
-        onclick={() => editorInstance?.chain().focus().toggleBold().run()}
-      >B</button>
-      <button
-        class="px-2 py-0.5 rounded hover:bg-[var(--card)] italic {editorInstance?.isActive('italic') ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-primary)]'}"
-        onclick={() => editorInstance?.chain().focus().toggleItalic().run()}
-      >I</button>
-      <button
-        class="px-2 py-0.5 rounded hover:bg-[var(--card)] {editorInstance?.isActive('heading', { level: 1 }) ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-primary)]'}"
-        onclick={() => editorInstance?.chain().focus().toggleHeading({ level: 1 }).run()}
-      >H1</button>
-      <button
-        class="px-2 py-0.5 rounded hover:bg-[var(--card)] {editorInstance?.isActive('heading', { level: 2 }) ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-primary)]'}"
-        onclick={() => editorInstance?.chain().focus().toggleHeading({ level: 2 }).run()}
-      >H2</button>
-      <button
-        class="px-2 py-0.5 rounded hover:bg-[var(--card)] {editorInstance?.isActive('bulletList') ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-primary)]'}"
-        onclick={() => editorInstance?.chain().focus().toggleBulletList().run()}
-      >• List</button>
-      <button
-        class="px-2 py-0.5 rounded hover:bg-[var(--card)] {editorInstance?.isActive('codeBlock') ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-primary)]'}"
-        onclick={() => editorInstance?.chain().focus().toggleCodeBlock().run()}
-      >&lt;/&gt; Code</button>
-      <button
-        class="px-2 py-0.5 rounded hover:bg-[var(--card)] {editorInstance?.isActive('blockquote') ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-primary)]'}"
-        onclick={() => editorInstance?.chain().focus().toggleBlockquote().run()}
-      >“ Quote</button>
-      <div class="h-4 w-px bg-[var(--border)] mx-1"></div>
-      <button
-        class="px-2 py-0.5 rounded hover:bg-[var(--card)] text-[var(--text-secondary)]"
-        onclick={() => editorInstance?.chain().focus().undo().run()}
-      >↶ Undo</button>
-      <button
-        class="px-2 py-0.5 rounded hover:bg-[var(--card)] text-[var(--text-secondary)]"
-        onclick={() => editorInstance?.chain().focus().redo().run()}
-      >↷ Redo</button>
-    </div>
-  {/if}
-
-  <!-- Main Split Editor Workspace -->
-  <div class="flex-1 min-h-0 overflow-hidden">
-    {#if editorMode === 'markdown'}
-      <div class="h-full grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-[var(--border)] overflow-hidden">
-        <!-- Editor Input Pane -->
-        <div class="h-full flex flex-col p-4 bg-[var(--bg-primary)]">
-          <textarea
-            bind:value={content}
-            oninput={handleContentChange}
-            placeholder="Type lecture notes here... Supports Markdown, $inline math$, $$block math$$, Mermaid code blocks, and embedded canvas sketches."
-            class="w-full flex-1 bg-transparent text-[var(--text-primary)] placeholder-[var(--text-secondary)] font-mono text-sm leading-relaxed resize-none focus:outline-hidden"
-          ></textarea>
-        </div>
-
-        <!-- Live KaTeX & Rich-Text Preview Pane -->
-        <div class="h-full flex flex-col p-4 bg-[var(--card)] overflow-y-auto">
-          <div class="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2 flex items-center justify-between">
-            <span>Live KaTeX & Layout Preview</span>
-            <span class="text-emerald-400 font-mono">Instant Render</span>
-          </div>
-          <div class="prose-editor text-[var(--text-primary)] text-sm leading-relaxed">
-            {@html renderedPreview}
-          </div>
-        </div>
-      </div>
-    {:else}
-      <!-- TipTap ProseMirror Rich Visual Editor View -->
-      <div class="h-full p-6 bg-[var(--card)] overflow-y-auto">
-        <div
-          bind:this={editorElement}
-          class="prose-editor text-[var(--text-primary)] text-sm leading-relaxed min-h-[400px] focus:outline-hidden"
-        ></div>
-      </div>
-    {/if}
+  <!-- Obsidian-Style Live Preview CodeMirror Workspace (Single Unified Pane) -->
+  <div class="flex-1 min-h-0 h-full w-full relative overflow-hidden bg-[var(--bg-primary)]">
+    <div
+      bind:this={editorContainer}
+      class="h-full w-full"
+    ></div>
   </div>
 
   <!-- Status Bar Footer -->
-  <div class="px-3 py-1.5 border-t border-[var(--border)] bg-[var(--bg-secondary)] flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
+  <div class="px-3 py-1.5 border-t border-[var(--border)] bg-[var(--bg-secondary)] flex items-center justify-between text-[11px] text-[var(--text-secondary)] shrink-0">
     <div class="flex items-center gap-3">
       <span class="flex items-center gap-1.5">
-        <span class="w-1.5 h-1.5 rounded-full {syncStatus.includes('Connected') ? 'bg-emerald-400' : 'bg-amber-400'}"></span>
-        <span class="font-mono">{syncStatus}</span>
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+        <span class="font-mono">{isLivePreview ? 'Obsidian Live Preview' : 'Source Mode'}</span>
       </span>
       <span>•</span>
       <span>{wordCount} words ({charCount} chars)</span>
@@ -495,7 +457,7 @@
       {#if isSaving}
         <span class="text-[var(--accent)] font-medium">Saving...</span>
       {:else}
-        <span class="text-emerald-400">✓ Saved (Tier 1/2)</span>
+        <span class="text-emerald-400">✓ Saved Offline</span>
       {/if}
     </div>
   </div>

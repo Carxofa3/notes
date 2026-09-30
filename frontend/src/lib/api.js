@@ -74,7 +74,7 @@ export async function fetchLessons() {
     if (res && res.ok) {
       try {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) return data;
+        if (Array.isArray(data)) return data;
       } catch (_) {}
     }
   }

@@ -200,20 +200,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG_NAME="v2.0.2"
-          TITLE="Notes Workstation v2.0.2 — File Explorer Tree, Custom Icons & Colors, Smart Auto-Organizer & High-Contrast Themes"
-          NOTES="### Notes Workstation v2.0.2 Release Packages
+          TAG_NAME="v2.0.3"
+          TITLE="Notes Workstation v2.0.3 — Obsidian-Style Live Preview & Zero-Sample Clean Slate"
+          NOTES="### Notes Workstation v2.0.3 Release Packages
           
-          This major update brings a full File Explorer layout, customizable folder/note icons and colors, smart auto-categorization, and distinct theme styling:
-          - **File Explorer Tree View**: Full collapsible folder hierarchy (\`▶\`/\`▼\`), folder note counts, inline creation, and safe deletion.
-          - **Custom Icons & Colors**: Choose from 24 emoji icons and 12 vibrant colors for courses, folders, and notes; relocate notes between folders at any time via the ⚙️ modal.
-          - **Smart Auto-Organizer**: 🪄 One-click organization that inspects note title and content to auto-assign notes to existing user folders or suggest new ones.
-          - **5 Distinct Themes**: High-contrast, completely differentiated color schemes (Dark Mocha, Paper White Light, Solarized Dark, Neon Cyberpunk, and AMOLED Pitch Black).
-          - **Persistent Sidebar**: Sidebar stays open while navigating courses and toggling folders; closes strictly when opening a note.
-          - **Permanent Android Keystore**: Signed with permanent release keystore to prevent package conflicts on updates.
+          This release introduces a unified Obsidian-style Live Preview editor, high-contrast text rendering, zero sample data, and direct course deletion:
+          - **Obsidian-Style Live Preview Editor**: Joined preview and plain text into a single unified workspace powered by CodeMirror 6 and live markdown rendering. Headings, bold/italic, tables, code blocks, and KaTeX math formulas render live in-place while remaining directly editable.
+          - **Crystal-Clear Text Visibility**: Full high-contrast input and caret rendering across all 5 themes (Catppuccin Mocha, Paper White Light, Solarized Dark, Cyberpunk, AMOLED), resolving Android WebView contrast and dark mode text issues.
+          - **Clean Zero-Sample Slate**: Removed all mock/starter courses, units, and notes. The app starts 100% clean and automatically purges legacy sample cache from localStorage.
+          - **Direct Course Deletion**: Added direct delete (\`🗑️\`) buttons to course tabs and cascade deletion for all associated folders and notes.
+          - **File Explorer & Customization**: Customizable folder/note icons and colors, smart auto-categorization, and persistent navigation drawer.
 
           #### Downloads:
-          - **Android (Xiaomi Poco / All Devices)**: \`Notes-Workstation-Android-Universal-v2.0.2.apk\`
+          - **Android (Universal APK)**: \`Notes-Workstation-Android-Universal-v2.0.3.apk\`
           - **Windows Desktop**: \`*.exe\`, \`*.msi\`, \`install.ps1\`
           - **Linux**: \`*.deb\`, \`*.AppImage\`, \`install.sh\`"
             

@@ -77,36 +77,12 @@
 
   async function loadInitialData() {
     lessons = await fetchLessons();
-    if (lessons.length === 0) {
-      const starterLesson = await createLesson('Biology 101', '🧬', '#10b981');
-      if (starterLesson) {
-        lessons = [starterLesson];
-        const starterUnit = await createUnit(starterLesson.id, 'Cellular Respiration', '⚡', '#10b981');
-        if (starterUnit) {
-          units = [starterUnit];
-          const starterNote = await createNote(starterUnit.id, {
-            title: 'Cellular Respiration & ATP Synthesis',
-            icon: '📝',
-            color: '#10b981',
-            content: `# Cellular Respiration & ATP Synthesis
-
-Cellular respiration is the biochemical process by which cells harvest chemical energy from glucose.
-
-## Net Reaction
-$$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{CO}_2 + 6\\text{H}_2\\text{O} + 36\\text{-}38 \\text{ ATP}$$
-
-- Glycolysis occurs in the cytosol (Net: 2 ATP, 2 NADH).
-- The Citric Acid Cycle occurs in the mitochondrial matrix.
-- Oxidative phosphorylation produces the bulk of ATP through the electron transport chain.
-`
-          });
-          activeLesson = starterLesson;
-          activeUnit = starterUnit;
-          activeNote = starterNote;
-        }
-      }
-    } else {
+    if (lessons.length > 0) {
       activeLesson = lessons[0];
+    } else {
+      activeLesson = null;
+      activeUnit = null;
+      activeNote = null;
     }
     await refreshTree();
   }
@@ -135,6 +111,12 @@ $$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{C
           activeUnit = units[0];
         }
       }
+    } else {
+      units = [];
+      notesByUnit = {};
+      notes = [];
+      activeUnit = null;
+      activeNote = null;
     }
   }
 
@@ -168,6 +150,19 @@ $$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{C
     }
   }
 
+  async function handleDeleteLesson(lesson) {
+    if (confirm(`Delete course "${lesson.name}" and all its folders and notes? This cannot be undone.`)) {
+      await deleteLesson(lesson.id);
+      lessons = lessons.filter(l => l.id !== lesson.id);
+      if (activeLesson?.id === lesson.id) {
+        activeLesson = lessons.length > 0 ? lessons[0] : null;
+        activeUnit = null;
+        activeNote = null;
+      }
+      await refreshTree();
+    }
+  }
+
   async function handleCreateFolder() {
     if (!activeLesson) {
       if (lessons.length > 0) activeLesson = lessons[0];
@@ -190,8 +185,8 @@ $$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{C
     const existing = notesByUnit[unit.id] || [];
     const count = existing.length + 1;
     const newNote = await createNote(unit.id, {
-      title: `Lecture Note ${count}`,
-      content: `# Lecture Note ${count}\n\n`,
+      title: `Note ${count}`,
+      content: `# Note ${count}\n\n`,
       icon: '📝',
       color: unit.color || '#3b82f6'
     });
@@ -204,9 +199,13 @@ $$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{C
 
   async function handleCreateNewNote() {
     if (!activeLesson) {
-      if (lessons.length > 0) activeLesson = lessons[0];
-      else {
-        const l = await createLesson('General Studies', '📚', '#3b82f6');
+      if (lessons.length > 0) {
+        activeLesson = lessons[0];
+      } else {
+        const name = prompt('Enter a Course Name for your note:');
+        if (!name || !name.trim()) return;
+        const l = await createLesson(name.trim(), '📚', '#3b82f6');
+        if (!l) return;
         lessons = [l];
         activeLesson = l;
       }
@@ -216,7 +215,10 @@ $$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{C
       if (existingUnits.length > 0) {
         activeUnit = existingUnits[0];
       } else {
-        const u = await createUnit(activeLesson.id, 'Lecture Notes', '📁', '#10b981');
+        const uName = prompt(`Enter Folder Name in ${activeLesson.name}:`);
+        if (!uName || !uName.trim()) return;
+        const u = await createUnit(activeLesson.id, uName.trim(), '📁', '#10b981');
+        if (!u) return;
         units = [u];
         activeUnit = u;
       }
@@ -263,9 +265,15 @@ $$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{C
   async function handleDeleteCustomizer(item) {
     if (item.type === 'lesson') {
       await deleteLesson(item.id);
-      if (activeLesson?.id === item.id) activeLesson = null;
+      lessons = lessons.filter(l => l.id !== item.id);
+      if (activeLesson?.id === item.id) {
+        activeLesson = lessons.length > 0 ? lessons[0] : null;
+        activeUnit = null;
+        activeNote = null;
+      }
     } else if (item.type === 'unit') {
       await deleteUnit(item.id);
+      units = units.filter(u => u.id !== item.id);
       if (activeUnit?.id === item.id) activeUnit = null;
       if (activeNote?.unit_id === item.id) activeNote = null;
     } else if (item.type === 'note') {
@@ -343,6 +351,9 @@ $$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{C
       current = current.replace(disputedClaim, `${correctionText} [🟢 Verified from Course Slides]`);
       handleSaveNote({ title: activeNote.title, content: current });
       activeNote.content = current;
+      if (editorRef.setContent) {
+        editorRef.setContent(current);
+      }
     }
   }
 
@@ -475,24 +486,33 @@ $$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{C
           </div>
         </div>
 
-        <!-- Course Tabs with Customizer Trigger -->
-        <div class="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-          {#each lessons as l}
-            <div class="shrink-0 flex items-center rounded-xl border transition-all {activeLesson?.id === l.id ? 'border-[var(--accent)] bg-[var(--card)] shadow-xs' : 'border-[var(--border)] bg-[var(--bg-primary)] opacity-80'}">
-              <button
-                class="px-2.5 py-1 text-xs font-semibold flex items-center gap-1.5 {activeLesson?.id === l.id ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'}"
-                onclick={() => selectLesson(l)}
-              >
-                <span>{l.icon || '📚'}</span>
-                <span>{l.name}</span>
-              </button>
-              <button
-                class="pr-2 pl-0.5 py-1 text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] opacity-60 hover:opacity-100"
-                onclick={() => openCustomizer(l, 'lesson')}
-                title="Customize Course"
-              >⚙️</button>
-            </div>
-          {/each}
+        <!-- Course Tabs with Customizer Trigger & Direct Delete -->
+        <div class="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none items-center">
+          {#if lessons.length === 0}
+            <span class="text-xs text-[var(--text-secondary)] italic py-1 px-1">No courses yet. Click "+ Course" to add one.</span>
+          {:else}
+            {#each lessons as l}
+              <div class="shrink-0 flex items-center rounded-xl border transition-all {activeLesson?.id === l.id ? 'border-[var(--accent)] bg-[var(--card)] shadow-xs' : 'border-[var(--border)] bg-[var(--bg-primary)] opacity-80'}">
+                <button
+                  class="px-2.5 py-1 text-xs font-semibold flex items-center gap-1.5 {activeLesson?.id === l.id ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'}"
+                  onclick={() => selectLesson(l)}
+                >
+                  <span>{l.icon || '📚'}</span>
+                  <span>{l.name}</span>
+                </button>
+                <button
+                  class="px-1 py-1 text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] opacity-60 hover:opacity-100"
+                  onclick={() => openCustomizer(l, 'lesson')}
+                  title="Customize Course"
+                >⚙️</button>
+                <button
+                  class="pr-2 pl-0.5 py-1 text-[11px] text-rose-400 hover:text-rose-300 opacity-60 hover:opacity-100"
+                  onclick={() => handleDeleteLesson(l)}
+                  title="Delete Course '{l.name}'"
+                >🗑️</button>
+              </div>
+            {/each}
+          {/if}
         </div>
       </div>
 
@@ -507,7 +527,15 @@ $$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{C
           >+ Folder</button>
         </div>
 
-        {#if units.length === 0}
+        {#if !activeLesson}
+          <div class="text-xs text-[var(--text-secondary)] text-center py-12 flex flex-col items-center gap-2">
+            <span>📚 No courses created yet.</span>
+            <button
+              class="px-3 py-1.5 rounded-xl bg-[var(--accent)] text-white text-xs font-semibold"
+              onclick={handleCreateLesson}
+            >Create First Course</button>
+          </div>
+        {:else if units.length === 0}
           <div class="text-xs text-[var(--text-secondary)] text-center py-8 flex flex-col items-center gap-2">
             <span>📁 No folders in this course yet.</span>
             <button
@@ -629,11 +657,23 @@ $$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{C
           onOpenPlotter={() => showPlotter = true}
           onAutoOrganize={handleAutoOrganizeActiveNote}
         />
+      {:else if lessons.length === 0}
+        <div class="flex-1 flex flex-col items-center justify-center p-8 text-center text-[var(--text-secondary)] gap-3">
+          <div class="w-16 h-16 rounded-2xl bg-[var(--surface)] border border-[var(--border)] flex items-center justify-center text-3xl">📚</div>
+          <h2 class="text-base font-bold text-[var(--text-primary)]">Welcome to Notes Workstation</h2>
+          <p class="text-xs max-w-sm">No courses exist yet. Create your first course or subject to begin organizing your lecture notes.</p>
+          <button
+            class="px-4 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-semibold hover:opacity-90 shadow-md"
+            onclick={handleCreateLesson}
+          >
+            + Create First Course
+          </button>
+        </div>
       {:else}
         <div class="flex-1 flex flex-col items-center justify-center p-8 text-center text-[var(--text-secondary)] gap-3">
           <div class="w-16 h-16 rounded-2xl bg-[var(--surface)] border border-[var(--border)] flex items-center justify-center text-2xl">📝</div>
           <h2 class="text-base font-bold text-[var(--text-primary)]">Select or Create a Note</h2>
-          <p class="text-xs max-w-sm">Choose a lesson and unit from the sidebar or click the button below to start taking lecture notes.</p>
+          <p class="text-xs max-w-sm">Choose a folder from the sidebar or click below to start taking notes in {activeLesson?.name || 'your course'}.</p>
           <button
             class="px-4 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-semibold hover:opacity-90 shadow-md"
             onclick={handleCreateNewNote}
@@ -652,6 +692,8 @@ $$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{C
         onOpenPlotter={() => showPlotter = true}
         onFactCheck={() => showFactCheck = true}
         onAutoOrganize={handleAutoOrganizeActiveNote}
+        onUndo={() => editorRef?.undoAction?.()}
+        onRedo={() => editorRef?.redoAction?.()}
       />
     </main>
   </div>

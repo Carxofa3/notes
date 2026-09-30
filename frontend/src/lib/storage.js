@@ -11,43 +11,46 @@ const STORAGE_KEYS = {
   SERVER_URL: 'notes_server_url'
 };
 
-// Default initial data for brand new installations
-const DEFAULT_LESSONS = [
-  { id: 'les-default-1', name: 'Biology 101' },
-  { id: 'les-default-2', name: 'Physics & Calculus' }
-];
+// Clean slate: Zero sample or mock data
+const DEFAULT_LESSONS = [];
+const DEFAULT_UNITS = [];
+const DEFAULT_NOTES = [];
 
-const DEFAULT_UNITS = [
-  { id: 'unit-default-1', lesson_id: 'les-default-1', name: 'Cellular Respiration' },
-  { id: 'unit-default-2', lesson_id: 'les-default-1', name: 'Genetics & DNA' },
-  { id: 'unit-default-3', lesson_id: 'les-default-2', name: 'Classical Mechanics' }
-];
+// Automatically purge any previous sample courses, folders, and notes from localStorage
+function purgeLegacySamples() {
+  try {
+    const sampleLessonIds = ['les-default-1', 'les-default-2'];
+    const sampleUnitIds = ['unit-default-1', 'unit-default-2', 'unit-default-3'];
+    const sampleNoteIds = ['note-default-1'];
 
-const DEFAULT_NOTES = [
-  {
-    id: 'note-default-1',
-    unit_id: 'unit-default-1',
-    title: 'Cellular Respiration & ATP Synthesis',
-    content: `# Cellular Respiration & ATP Synthesis
+    let lessons = JSON.parse(localStorage.getItem(STORAGE_KEYS.LESSONS) || '[]');
+    let units = JSON.parse(localStorage.getItem(STORAGE_KEYS.UNITS) || '[]');
+    let notes = JSON.parse(localStorage.getItem(STORAGE_KEYS.NOTES) || '[]');
 
-Cellular respiration is the biochemical process by which cells harvest chemical energy from glucose.
+    const hasSamples = lessons.some(l => sampleLessonIds.includes(l.id) || l.name === 'Biology 101' || l.name === 'Physics & Calculus' || l.name === 'General Studies') ||
+      units.some(u => sampleUnitIds.includes(u.id) || u.name === 'Cellular Respiration' || u.name === 'Genetics & DNA' || u.name === 'Classical Mechanics') ||
+      notes.some(n => sampleNoteIds.includes(n.id) || n.title === 'Cellular Respiration & ATP Synthesis');
 
-## Net Reaction
-$$\\text{C}_6\\text{H}_{12}\\text{O}_6 + 6\\text{O}_2 \\longrightarrow 6\\text{CO}_2 + 6\\text{H}_2\\text{O} + 36\\text{-}38 \\text{ ATP}$$
-
-- **Glycolysis** occurs in the cytosol (Net: 2 ATP, 2 NADH).
-- **Citric Acid Cycle** occurs in the mitochondrial matrix.
-- **Oxidative Phosphorylation** produces the bulk of ATP through the electron transport chain.
-`,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    if (hasSamples) {
+      lessons = lessons.filter(l => !sampleLessonIds.includes(l.id) && l.name !== 'Biology 101' && l.name !== 'Physics & Calculus' && l.name !== 'General Studies');
+      units = units.filter(u => !sampleUnitIds.includes(u.id) && u.name !== 'Cellular Respiration' && u.name !== 'Genetics & DNA' && u.name !== 'Classical Mechanics');
+      notes = notes.filter(n => !sampleNoteIds.includes(n.id) && n.title !== 'Cellular Respiration & ATP Synthesis');
+      localStorage.setItem(STORAGE_KEYS.LESSONS, JSON.stringify(lessons));
+      localStorage.setItem(STORAGE_KEYS.UNITS, JSON.stringify(units));
+      localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(notes));
+    }
+  } catch (e) {
+    console.warn('[Storage] purgeLegacySamples error:', e);
   }
-];
+}
 
-function getStored(key, defaultVal) {
+// Purge on module load
+purgeLegacySamples();
+
+function getStored(key, defaultVal = []) {
   try {
     const raw = localStorage.getItem(key);
-    if (!raw) {
+    if (raw === null) {
       localStorage.setItem(key, JSON.stringify(defaultVal));
       return defaultVal;
     }
