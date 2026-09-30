@@ -11,6 +11,7 @@ permissions:
   contents: write
 
 jobs:
+  # ── Backend Tests ──────────────────────────────────────────────────────────
   test-backend:
     name: Backend Tests (Python)
     runs-on: ubuntu-latest
@@ -28,6 +29,7 @@ jobs:
         run: |
           pytest tests/ -v
 
+  # ── Frontend Build ─────────────────────────────────────────────────────────
   build-frontend:
     name: Frontend Build (Svelte 5)
     runs-on: ubuntu-latest
@@ -50,8 +52,58 @@ jobs:
           name: frontend-dist
           path: frontend/dist
 
+  # ── Windows PyInstaller EXE ────────────────────────────────────────────────
+  build-pyinstaller-windows:
+    name: Windows Desktop (PyInstaller EXE)
+    needs: [test-backend, build-frontend]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller pywebview
+
+      - name: Build frontend
+        run: |
+          npm --prefix frontend ci
+          npm --prefix frontend run build
+
+      - name: Build Windows EXE with PyInstaller
+        run: |
+          pyinstaller `
+            --onefile `
+            --name "Notes-Workstation-Windows" `
+            --add-data "frontend/dist;frontend/dist" `
+            --add-data "app;app" `
+            --hidden-import "flask" `
+            --hidden-import "flask_restx" `
+            --hidden-import "werkzeug" `
+            --hidden-import "webview" `
+            --collect-all "webview" `
+            desktop.py
+
+      - name: Upload Windows EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-exe
+          path: dist/Notes-Workstation-Windows.exe
+
+  # ── Tauri Desktop (Windows + Linux) ───────────────────────────────────────
   build-desktop:
-    name: Desktop Build (${{ matrix.platform }})
+    name: Tauri Desktop (${{ matrix.platform }})
     needs: [test-backend, build-frontend]
     strategy:
       fail-fast: false
@@ -93,6 +145,7 @@ jobs:
             src-tauri/target/release/bundle/deb/*.deb
             src-tauri/target/release/bundle/appimage/*.AppImage
 
+  # ── Android APK ───────────────────────────────────────────────────────────
   build-android:
     name: Android Build (APK)
     needs: [test-backend, build-frontend]
@@ -135,28 +188,24 @@ jobs:
           mkdir -p release-apk
           BUILD_TOOLS_DIR=$(ls -d ${ANDROID_HOME}/build-tools/* | tail -n 1)
           echo "Using Android build-tools: $BUILD_TOOLS_DIR"
-          
-          # Use checked-in permanent release keystore if present, otherwise generate
+
           if [ ! -f release.keystore ]; then
             keytool -genkey -v -keystore release.keystore -alias notesworkstation -keyalg RSA -keysize 2048 -validity 10000 -storepass notes1234 -keypass notes1234 -dname "CN=NotesWorkstation, OU=Notes, O=Notes, L=Global, S=Global, C=US"
           fi
-          
-          # Locate unsigned APK
+
           UNSIGNED_APK=$(find src-tauri/gen/android/ -name "*universal-release-unsigned.apk" -o -name "*release-unsigned.apk" | head -n 1)
           echo "Found unsigned APK: $UNSIGNED_APK"
-          
+
           APP_VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
-          
-          # Align 4-byte boundaries
+
           $BUILD_TOOLS_DIR/zipalign -v -p 4 "$UNSIGNED_APK" aligned.apk
-          
-          # Sign with v1, v2, v3 signature schemes
-          $BUILD_TOOLS_DIR/apksigner sign --ks release.keystore --ks-pass pass:notes1234 --key-pass pass:notes1234 --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true --out release-apk/Notes-Workstation-Android-Universal-v${APP_VERSION}.apk aligned.apk
-          
-          # Verify signature
+
+          $BUILD_TOOLS_DIR/apksigner sign \
+            --ks release.keystore --ks-pass pass:notes1234 --key-pass pass:notes1234 \
+            --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true \
+            --out release-apk/Notes-Workstation-Android-Universal-v${APP_VERSION}.apk aligned.apk
+
           $BUILD_TOOLS_DIR/apksigner verify -v release-apk/Notes-Workstation-Android-Universal-v${APP_VERSION}.apk
-          
-          # Also copy as default APK name
           cp release-apk/Notes-Workstation-Android-Universal-v${APP_VERSION}.apk release-apk/Notes-Workstation-Android-v${APP_VERSION}.apk
 
       - name: Build Android Debug APK (Pre-signed Fallback)
@@ -176,48 +225,79 @@ jobs:
           name: android-apk
           path: release-apk/*.apk
 
+  # ── Publish GitHub Release ─────────────────────────────────────────────────
   publish-release:
     name: Publish GitHub Release
     if: always() && !cancelled()
-    needs: [build-desktop, build-android]
+    needs: [build-pyinstaller-windows, build-desktop, build-android]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Download all workflow artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+
       - name: Collect Release Binaries
         run: |
           mkdir -p release-assets
-          cp install.ps1 release-assets/Notes-Workstation-Installer-Windows.ps1
-          cp install.sh release-assets/Notes-Workstation-Installer-Linux.sh
-          
-          # Find all installers and APKs from downloaded artifacts
-          find artifacts/ -type f \( -name "*.apk" -o -name "*.msi" -o -name "*.exe" -o -name "*.deb" -o -name "*.AppImage" \) -exec cp {} release-assets/ \;
-          ls -la release-assets/
-      - name: Create or Update Release
+          # Installer scripts
+          [ -f install.ps1 ] && cp install.ps1 release-assets/Notes-Workstation-Installer-Windows.ps1 || true
+          [ -f install.sh  ] && cp install.sh  release-assets/Notes-Workstation-Installer-Linux.sh    || true
+
+          # All built binaries
+          find artifacts/ -type f \( \
+            -name "*.apk" -o \
+            -name "*.msi" -o \
+            -name "*.exe" -o \
+            -name "*.deb" -o \
+            -name "*.AppImage" \
+          \) -exec cp {} release-assets/ \;
+
+          ls -lh release-assets/
+
+      - name: Create or Update GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG_NAME="v2.0.6"
-          TITLE="Notes Workstation v2.0.6 — High-Contrast Pairing QR Code & Wi-Fi Scan Mode"
-          NOTES="### Notes Workstation v2.0.6 Release Packages
-          
-          This release fixes the blank QR code issue and introduces instant Wi-Fi phone-to-PC pairing:
-          - **Fix Blank White Pairing QR Code**: Replaced timing-sensitive DOM canvas rendering with reactive high-resolution \`QRCode.toDataURL\` image rendering. Guarantees an immediate, sharp QR code even if backend is offline or starting up.
-          - **Dual Pairing Modes**:
-            - 📡 **Wi-Fi Quick Connect**: Encodes the direct LAN IP address (\`http://192.168.0.45:5000\`), easily scannable by any standard phone camera or mobile Notes app to connect immediately.
-            - 🔒 **Tailscale P2P Mesh**: Encodes mTLS cryptographic fingerprints and MagicDNS node tokens for decentralized synchronization.
-          - **One-Click Connection URL Copy**: Added a one-click copy button with animated feedback so you can easily copy and paste the connection string.
-          - **Fix PC White Screen & Asset Resolution**: Configured Vite with \`base: './'\` (relative paths) for desktop Tauri WebView2.
-          - **ChatGPT-Style Codeboxes & Syntax Auto-Highlighting**: Dark slate container, language badge header, and animated Copy Code button.
+          TAG_NAME="v2.1.0"
+          TITLE="Notes Workstation v2.1.0 — GLiNER NER, LAN Mesh & Tailscale Cross-Network"
+          NOTES="### Notes Workstation v2.1.0
 
-          #### Downloads:
-          - **Android (Universal APK)**: \`Notes-Workstation-Android-Universal-v0.2.5.apk\`
-          - **Windows Desktop**: \`*.exe\`, \`*.msi\`, \`install.ps1\`
-          - **Linux**: \`*.deb\`, \`*.AppImage\`, \`install.sh\`"
-            
-          # Create or edit release
-          gh release view "$TAG_NAME" || gh release create "$TAG_NAME" release-assets/* --title "$TITLE" --notes "$NOTES" --latest
+          #### What's new
+
+          - **GLiNER Neural NER** — On-demand download of the GLiNER model for academic entity extraction. Integrated into the decision service with fallback to the regex engine. API endpoints: \`GET /gliner/status\`, \`POST /gliner/download\`, \`POST /gliner/extract\`, \`POST /gliner/lan-toggle\`.
+          - **Zero-config LAN Mesh Discovery** — UDP beacon on port 58856 auto-discovers all peers on the same network (inspired by LM Studio Nodes). See all discovered devices at \`GET /sync/discovered-nodes\`.
+          - **Tailscale Cross-Network Support** — Desktop app now ships with built-in Tailscale integration. Launch with \`--tailscale\` to automatically connect your device to your Tailnet for seamless cross-network access. Auth URL is printed (and opened in the browser) if the device is not yet authenticated. Connection info (LAN + Tailscale IPs) is displayed at startup.
+          - **High-Contrast Code Blocks** — Rewrote dark-theme code-box CSS with a vibrant Dracula-inspired palette (\`#0f1017\` background, vivid token colours). No more white-on-dark text.
+          - **GitHub Actions CI** — Added \`build-pyinstaller-windows\` job: frontend is built inside CI, bundled into a single-file \`Notes-Workstation-Windows.exe\` via PyInstaller, and uploaded as a release asset automatically.
+
+          #### Downloads
+
+          | Platform | File |
+          |---|---|
+          | Windows (standalone EXE) | \`Notes-Workstation-Windows.exe\` |
+          | Windows (MSI installer) | \`*.msi\` |
+          | Linux (Deb package) | \`*.deb\` |
+          | Linux (AppImage) | \`*.AppImage\` |
+          | Android (Universal APK) | \`Notes-Workstation-Android-Universal-*.apk\` |
+
+          #### Usage — Tailscale cross-network
+
+          \`\`\`
+          # Windows
+          Notes-Workstation-Windows.exe --tailscale
+
+          # Python (dev)
+          python desktop.py --tailscale
+          \`\`\`
+
+          The app will auto-start Tailscale, print your Tailscale IP, and display it in the connection-info block at startup. Share the \`http://100.x.x.x:5000\` URL with any device on your Tailnet."
+
+          gh release view "$TAG_NAME" \
+            || gh release create "$TAG_NAME" release-assets/* \
+               --title "$TITLE" \
+               --notes "$NOTES" \
+               --latest
           gh release upload "$TAG_NAME" release-assets/* --clobber

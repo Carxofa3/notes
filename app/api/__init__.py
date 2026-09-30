@@ -11,6 +11,7 @@ from .rag import ns as rag_ns
 from .sync import ns as sync_ns
 from .academic import ns as academic_ns
 from .decide import ns as decide_ns, decide_bp
+from .gliner import ns as gliner_ns
 
 api_bp = Blueprint('api', __name__)
 
@@ -41,3 +42,5 @@ api.add_namespace(rag_ns, path='/rag')
 api.add_namespace(sync_ns, path='/sync')
 api.add_namespace(academic_ns, path='/academic')
 api.add_namespace(decide_ns, path='/decide')
+api.add_namespace(gliner_ns, path='/gliner')
+

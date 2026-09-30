@@ -130,9 +130,10 @@ input::placeholder, textarea::placeholder {
 }
 
 .cm-editor .cm-line {
-  color: var(--text-primary) !important;
+  color: var(--text-primary);
   padding: 1px 0 !important;
 }
+
 
 .cm-editor .cm-cursor, 
 .cm-editor .cm-dropCursor {
@@ -218,9 +219,9 @@ input::placeholder, textarea::placeholder {
   margin: 1.25rem 0 !important;
   border-radius: 0.75rem !important;
   overflow: hidden !important;
-  background-color: #181825 !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+  background-color: #0f1017 !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45) !important;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
   max-width: 100% !important;
 }
@@ -230,7 +231,7 @@ input::placeholder, textarea::placeholder {
   align-items: center !important;
   justify-content: space-between !important;
   padding: 0.5rem 1rem !important;
-  background-color: #11111b !important;
+  background-color: #161722 !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
   user-select: none !important;
   cursor: pointer !important;
@@ -238,8 +239,8 @@ input::placeholder, textarea::placeholder {
 
 .chatgpt-code-lang {
   font-size: 0.75rem !important;
-  font-weight: 600 !important;
-  color: #a6adc8 !important;
+  font-weight: 700 !important;
+  color: #89b4fa !important;
   text-transform: lowercase !important;
   letter-spacing: 0.05em !important;
   font-family: inherit !important;
@@ -279,7 +280,7 @@ input::placeholder, textarea::placeholder {
   padding: 0.875rem 1rem !important;
   overflow-x: auto !important;
   -webkit-overflow-scrolling: touch !important;
-  background-color: #181825 !important;
+  background-color: #0f1017 !important;
 }
 
 .chatgpt-code-body {
@@ -288,7 +289,7 @@ input::placeholder, textarea::placeholder {
   font-size: 0.875rem !important;
   line-height: 1.65 !important;
   tab-size: 2 !important;
-  color: #cdd6f4 !important;
+  color: #bac2de !important; /* Soft legible slate/lavender instead of stark white */
 }
 
 .chatgpt-code-line {
@@ -301,82 +302,120 @@ input::placeholder, textarea::placeholder {
 
 /* Source mode code fence styling (when cursor is editing inside ```) */
 .cm-codeblock-source {
-  background-color: rgba(24, 24, 37, 0.5) !important;
-  border-left: 3px solid var(--accent, #6366f1) !important;
-  padding-left: 0.75rem !important;
+  background-color: #0f1017 !important;
+  border-left: 3px solid var(--accent, #89b4fa) !important;
+  padding-left: 1rem !important;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
   font-size: 0.875rem !important;
+  color: #bac2de !important;
 }
 
-/* One Dark / Catppuccin Mocha High-Contrast Syntax Colors */
+/* Vibrant Dracula / Catppuccin High-Contrast Syntax Colors */
 .hljs-keyword,
 .hljs-selector-tag,
-.hljs-subst {
-  color: #c678dd !important; /* Bright Magenta / Violet */
+.hljs-subst,
+.cm-editor .tok-keyword {
+  color: #ff79c6 !important; /* Neon Vivid Pink / Magenta */
   font-weight: 600 !important;
 }
 
 .hljs-function,
 .hljs-title.function_,
-.hljs-title.class_ {
-  color: #61afef !important; /* Bright Blue */
+.hljs-title.class_,
+.cm-editor .tok-function,
+.cm-editor .tok-definition {
+  color: #8be9fd !important; /* Vibrant Cyan / Aqua */
   font-weight: 600 !important;
 }
 
 .hljs-title,
 .hljs-section {
-  color: #61afef !important;
+  color: #8be9fd !important;
   font-weight: 600 !important;
 }
 
 .hljs-string,
 .hljs-attribute,
-.hljs-addition {
-  color: #98c379 !important; /* Vibrant Emerald / Mint */
+.hljs-addition,
+.cm-editor .tok-string {
+  color: #50fa7b !important; /* Radiant Emerald / Mint Green */
 }
 
 .hljs-number,
-.hljs-literal {
-  color: #d19a66 !important; /* Warm Amber / Orange */
+.hljs-literal,
+.cm-editor .tok-number,
+.cm-editor .tok-bool {
+  color: #ffb86c !important; /* Warm Glowing Amber / Peach */
+  font-weight: 600 !important;
 }
 
 .hljs-comment,
-.hljs-quote {
-  color: #7f849c !important; /* Muted Slate / Grey */
+.hljs-quote,
+.cm-editor .tok-comment {
+  color: #6c7086 !important; /* Muted Slate */
   font-style: italic !important;
 }
 
 .hljs-type,
-.hljs-class {
-  color: #e5c07b !important; /* Gold / Yellow */
+.hljs-class,
+.cm-editor .tok-typeName {
+  color: #f1fa8c !important; /* Bright Canary Yellow */
+  font-weight: 600 !important;
 }
 
 .hljs-params,
-.hljs-variable {
-  color: #e06c75 !important; /* Soft Coral Red */
+.hljs-variable,
+.hljs-variable.language_,
+.cm-editor .tok-variableName {
+  color: #f38ba8 !important; /* Soft Coral Rose */
+}
+
+.hljs-variable.constant_ {
+  color: #ffb86c !important;
+  font-weight: 600 !important;
 }
 
 .hljs-built_in,
-.hljs-builtin-name {
-  color: #56b6c2 !important; /* Cyan / Aqua */
+.hljs-builtin-name,
+.cm-editor .tok-meta {
+  color: #bd93f9 !important; /* Deep Electric Purple */
 }
 
-.hljs-meta {
-  color: #c678dd !important;
+.hljs-meta,
+.hljs-meta .hljs-keyword {
+  color: #ff79c6 !important;
 }
 
-.hljs-attr {
-  color: #d19a66 !important;
+.hljs-attr,
+.hljs-property,
+.cm-editor .tok-propertyName {
+  color: #ffb86c !important;
 }
 
 .hljs-tag,
 .hljs-name {
-  color: #e06c75 !important;
+  color: #ff79c6 !important;
 }
 
-.hljs-punctuation {
+.hljs-operator,
+.cm-editor .tok-operator {
+  color: #ff79c6 !important;
+}
+
+.hljs-punctuation,
+.cm-editor .tok-punctuation {
   color: #abb2bf !important;
 }
+
+/* Markdown Text Highlighter (==text== / <mark>) */
+mark, .cm-highlight-text, .text-highlight {
+  background: rgba(249, 226, 175, 0.35) !important;
+  color: #f9e2af !important;
+  border-radius: 4px !important;
+  padding: 1px 5px !important;
+  font-weight: 500 !important;
+}
+
 
 /* Tables */
 .cm-table-widget, .cm-editor table {

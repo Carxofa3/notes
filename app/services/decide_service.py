@@ -107,6 +107,17 @@ class JevDecideEngine:
         return best_cls, confidence
 
     def _extract_entities(self, context: str, requested_types: List[str]) -> List[Dict[str, Any]]:
+        # 1. Neural GLiNER model if loaded
+        try:
+            from app.services.gliner_service import gliner_service
+            if gliner_service.is_ready():
+                neural_entities = gliner_service.extract_entities(context, labels=requested_types)
+                if neural_entities:
+                    return neural_entities
+        except Exception:
+            pass
+
+        # 2. High-speed heuristic / regex fallback
         entities = []
         seen = set()
 

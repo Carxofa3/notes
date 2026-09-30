@@ -72,3 +72,13 @@ class GetCrdtDelta(Resource):
             'note_id': note_id,
             'delta_base64': base64.b64encode(delta_bytes).decode('utf-8')
         }, 200
+
+@ns.route('/discovered-nodes')
+class DiscoveredNodes(Resource):
+    def get(self):
+        """List all auto-discovered local LAN peer nodes (LM Studio Nodes style)"""
+        return {
+            'nodes': sync_service.get_discovered_nodes(),
+            'local_device': sync_service.get_device_info()
+        }, 200
+
