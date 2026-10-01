@@ -186,6 +186,7 @@ jobs:
           export ANDROID_HOME="/usr/local/lib/android/sdk"
           export NDK_HOME="/usr/local/lib/android/sdk/ndk/26.1.10909125"
           npx tauri android init --ci
+          python3 scripts/patch_android_camera.py
           npx tauri android build --apk --target aarch64
 
       - name: Sign & Align Android Release APK
@@ -275,6 +276,7 @@ jobs:
 
           - **Fix Database Missing Table Error (`no such table: lesson`)**: Automatically ensures SQLite database tables are created on startup via `db.create_all()`. Standalone `.exe` runs now work out-of-the-box on fresh Windows installs without manual migrations!
           - **Persistent SQLite Storage**: Portable standalone `.exe` now safely persists its SQLite database in the user data directory (`~/.notes_workstation/notes.db`), ensuring notes and settings are never lost across restarts.
+          - **Native Android Camera Permission Prompt**: The Android app now triggers the native OS camera permission dialog (*"Allow Notes Workstation to take pictures and record video?"*) when tapping `📷 Scan QR Code`, bridging `WebChromeClient.onPermissionRequest` to Android's runtime permission system.
           - **In-App Camera QR Code Scanner**: Added a dedicated `📷 Scan QR Code` live camera viewfinder directly inside the Device Sync & Pairing modal! Supports phones, tablets, and laptops with webcams via `html5-qrcode`.
           - **Instant Auto-Connect**: Scanning a Wi-Fi or Tailscale connection QR code instantly switches your mobile device backend URL, verifies connectivity, and synchronizes real-time P2P notes immediately without manual typing.
           - **Smart Connect Field**: The manual connect box now intelligently parses both raw HTTP/HTTPS URLs (`http://192.168.0.45:5000`) and JSON cryptographic pairing tokens.

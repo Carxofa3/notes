@@ -143,6 +143,22 @@
     isScanning = true;
     registerMessage = '';
     await tick();
+
+    // Explicitly trigger the browser/Android system camera permission prompt
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        stream.getTracks().forEach(t => t.stop());
+      } catch (permErr) {
+        console.warn('Camera permission check result:', permErr);
+        if (permErr.name === 'NotAllowedError' || permErr.name === 'PermissionDeniedError') {
+          scannerError = 'Camera permission was denied. Please allow Camera in phone Settings > Apps > Notes Workstation.';
+          isScanning = false;
+          return;
+        }
+      }
+    }
+
     try {
       const scanner = new Html5Qrcode('qr-reader');
       scannerInstance = scanner;

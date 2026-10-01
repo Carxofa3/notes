@@ -10,7 +10,8 @@ def get_database_uri():
     # 1. If notes.db exists in current working directory, use it
     local_db = os.path.join(os.getcwd(), 'notes.db')
     if os.path.exists(local_db):
-        return f"sqlite:///{local_db.replace('\\', '/')}"
+        clean_local = local_db.replace('\\', '/')
+        return f"sqlite:///{clean_local}"
     
     # 2. Otherwise, store in persistent user home directory (~/.notes_workstation/notes.db)
     # This prevents SQLite database loss when running standalone portable EXEs
