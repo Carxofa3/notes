@@ -19,10 +19,11 @@
     triggerGlinerDownload,
     fetchAppVersion
   } from '../api.js';
+  import { setPairedConnection, clearPairedConnection } from '../storage.js';
 
   let { isOpen = $bindable(false) } = $props();
 
-  let currentAppVer = $state('v2.1.9');
+  let currentAppVer = $state('v2.1.11');
   let pairInfo = $state(null);
   let peers = $state([]);
   let inputToken = $state('');
@@ -340,7 +341,7 @@
   }
 
   function handleDisconnect() {
-    setServerUrl('');
+    clearPairedConnection();
     currentServerUrl = '';
     window.dispatchEvent(new CustomEvent('notes-server-changed', { detail: '' }));
     registerMessage = 'ℹ️ Disconnected from workstation. Operating in standalone offline mode.';
@@ -436,7 +437,7 @@
       }
 
       if (winner) {
-        setServerUrl(winner.url);
+        setPairedConnection(payload, winner.url);
         currentServerUrl = winner.url;
         window.dispatchEvent(new CustomEvent('notes-server-changed', { detail: winner.url }));
 
@@ -459,7 +460,7 @@
       } else {
         // Fallback: Configure primary candidate anyway
         const fallback = uniqueCandidates[0];
-        setServerUrl(fallback.url);
+        setPairedConnection(payload, fallback.url);
         currentServerUrl = fallback.url;
         window.dispatchEvent(new CustomEvent('notes-server-changed', { detail: fallback.url }));
         registerMessage = `⚠️ Configured server to ${fallback.url}, but host did not respond immediately. Check network and firewall.`;

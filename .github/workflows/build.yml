@@ -248,7 +248,7 @@ jobs:
   # ── Publish GitHub Release ─────────────────────────────────────────────────
   publish-release:
     name: Publish GitHub Release
-    if: always() && !cancelled()
+    if: ${{ (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && always() && !cancelled() }}
     needs: [build-pyinstaller-windows, build-desktop, build-android]
     runs-on: ubuntu-latest
     steps:
@@ -281,20 +281,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG_NAME="v2.1.10"
-          TITLE="Notes Workstation v2.1.10 — Zero Console Popups & Silent Background Subprocesses"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            TAG_NAME="$GITHUB_REF_NAME"
+          else
+            APP_VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+            TAG_NAME="v${APP_VERSION}"
+          fi
+          TITLE="Notes Workstation ${TAG_NAME} — Persistent Network Pairing"
           cat << 'EOF' > release_notes.md
-          ### Notes Workstation v2.1.10
+          ### Notes Workstation — Persistent Network Pairing
 
           #### What's new in this release
 
-          - **Complete Subprocess Window Suppression (Zero Flashing Terminal Popups)**: Fixed the issue where short-lived black terminal windows repeatedly popped up and closed every few seconds during background polling. Replaced PowerShell GPU inspection with instant, native Windows Registry (`winreg`) reads (0 spawned processes), cached hardware specs persistently, and added `CREATE_NO_WINDOW = 0x08000000` to all subprocess calls (Tailscale, updater, GPU, pip).
-          - **Resilient Background Server Keep-Alive**: Hardened fallback mechanism in `desktop.py` to ensure the local server remains running persistently if pywebview or external browser handles are invoked.
-          - **Pure Windowed Desktop (No Terminal / Console Window)**: The Windows application launches exclusively as a sleek, native GUI window (`--windowed`, `console=False`). Tailscale mesh and synchronization background processes run completely silently.
-          - **In-App Accessible Dialog System**: Full in-app dialogs for `+ Course`, `+ Folder`, and `Make a new note` buttons.
-          - **Workstation Hub & Settings Tab Switching**: Instant switching across Appearance, Network & Mesh, AI & Compute, Storage, and About tabs.
-          - **P2P Mesh Modal Crash Fix**: Restored missing `fetchAppVersion` import in `TailscalePairingModal`.
-          - **Seamless Upgrader**: Installer automatically detects and silently upgrades previous installations.
+          - Paired devices retain both LAN and Tailscale addresses and switch routes automatically when one becomes unreachable.
+          - Tailscale is used only when already configured; the app no longer starts its client or opens authentication prompts on startup.
+          - Includes the existing silent desktop launcher, multi-platform installers, and Android package.
 
           #### Downloads
 
@@ -317,6 +318,5 @@ jobs:
           ```
           EOF
 
-          gh release view "$TAG_NAME" || gh release create "$TAG_NAME" release-assets/* --title "$TITLE" --notes-file release_notes.md --latest
+          gh release view "$TAG_NAME" || gh release create "$TAG_NAME" --title "$TITLE" --notes-file release_notes.md --latest
           gh release upload "$TAG_NAME" release-assets/* --clobber
-

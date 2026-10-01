@@ -8,7 +8,8 @@ const STORAGE_KEYS = {
   LESSONS: 'notes_offline_lessons',
   UNITS: 'notes_offline_units',
   NOTES: 'notes_offline_notes',
-  SERVER_URL: 'notes_server_url'
+  SERVER_URL: 'notes_server_url',
+  PAIRED_CONNECTION: 'notes_paired_connection'
 };
 
 // Clean slate: Zero sample or mock data
@@ -77,6 +78,38 @@ export function setServerUrl(url) {
   const clean = (url || '').trim().replace(/\/+$/, '');
   localStorage.setItem(STORAGE_KEYS.SERVER_URL, clean);
   return clean;
+}
+
+export function getPairedConnection() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.PAIRED_CONNECTION) || 'null'); }
+  catch (_) { return null; }
+}
+
+export function setPairedConnection(payload, activeUrl) {
+  const endpoints = [payload?.lan_url, payload?.tailscale_url]
+    .filter(url => typeof url === 'string' && /^https?:\/\//i.test(url))
+    .map(url => url.replace(/\/+$/, ''));
+  const connection = {
+    name: payload?.name || payload?.device_name || 'Notes Workstation',
+    endpoints: [...new Set(endpoints)],
+    activeUrl: (activeUrl || endpoints[0] || '').replace(/\/+$/, '')
+  };
+  localStorage.setItem(STORAGE_KEYS.PAIRED_CONNECTION, JSON.stringify(connection));
+  if (connection.activeUrl) setServerUrl(connection.activeUrl);
+  return connection;
+}
+
+export function setActivePairedEndpoint(url) {
+  const connection = getPairedConnection();
+  if (!connection) return;
+  connection.activeUrl = (url || '').replace(/\/+$/, '');
+  localStorage.setItem(STORAGE_KEYS.PAIRED_CONNECTION, JSON.stringify(connection));
+  setServerUrl(connection.activeUrl);
+}
+
+export function clearPairedConnection() {
+  localStorage.removeItem(STORAGE_KEYS.PAIRED_CONNECTION);
+  setServerUrl('');
 }
 
 // Lessons

@@ -7,6 +7,8 @@
 import {
   getServerUrl,
   setServerUrl,
+  getPairedConnection,
+  setActivePairedEndpoint,
   getLocalLessons,
   saveLocalLesson,
   updateLocalLesson,
@@ -59,16 +61,27 @@ function getBase() {
 }
 
 async function safeFetch(url, options = {}, timeoutMs = 1500) {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, { ...options, signal: controller.signal });
-    clearTimeout(id);
-    return res;
-  } catch (e) {
-    clearTimeout(id);
-    return null;
+  const connection = getPairedConnection();
+  const active = connection?.activeUrl || getServerUrl();
+  const path = active && url.startsWith(active) ? url.slice(active.length) : null;
+  const endpoints = path && connection?.endpoints?.length
+    ? [active, ...connection.endpoints.filter(endpoint => endpoint !== active)]
+    : [null];
+
+  for (const endpoint of endpoints) {
+    const target = endpoint ? `${endpoint}${path}` : url;
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(target, { ...options, signal: controller.signal });
+      clearTimeout(id);
+      if (res.ok && endpoint && endpoint !== active) setActivePairedEndpoint(endpoint);
+      return res;
+    } catch (_) {
+      clearTimeout(id);
+    }
   }
+  return null;
 }
 
 // --- Lessons (Courses) ---
@@ -508,4 +521,3 @@ export async function checkAppUpdatesDirect(platform = '') {
     return null;
   }
 }
-

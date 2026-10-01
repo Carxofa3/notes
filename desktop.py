@@ -316,9 +316,8 @@ def main():
     root_dir = os.path.abspath(os.path.dirname(__file__))
     os.chdir(root_dir)
 
-    # 1. Tailscale is enabled by default (runs non-blocking in background)
-    if args.tailscale:
-        start_tailscale(background=True)
+    # Do not attempt to install, start, or authenticate Tailscale. Use it only
+    # when the user has already configured the client; LAN remains available.
 
     # 2. Start Yjs P2P sync server in background
     sync_port = args.sync_port or find_free_port(58855)
