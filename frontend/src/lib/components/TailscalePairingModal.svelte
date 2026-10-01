@@ -53,7 +53,8 @@
   // Auto-Updater State
   let updateInfo = $state(null);
   let isCheckingUpdate = $state(false);
-  let currentAppVer = $state('v2.1.5');
+  let updateError = $state('');
+  let currentAppVer = $state(`v${typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '?.?.?'}`);
   let clusterPollTimer = null;
   let glinerPollTimer = null;
 
@@ -327,14 +328,18 @@
 
   async function handleCheckForUpdates() {
     isCheckingUpdate = true;
+    updateError = '';
     try {
       const detectedPlatform = /android/i.test(navigator.userAgent) ? 'android' : (/linux/i.test(navigator.userAgent) ? 'linux' : 'windows');
       const res = await checkAppUpdates(detectedPlatform);
       if (res) {
         updateInfo = res;
+      } else {
+        updateError = 'Could not reach GitHub. Check your internet connection.';
       }
     } catch (e) {
       console.warn('Update check failed:', e);
+      updateError = `Update check failed: ${e.message || 'Unknown error'}`;
     } finally {
       isCheckingUpdate = false;
     }
@@ -646,6 +651,11 @@
                   <span>✅ Notes Workstation is completely up to date ({currentAppVer}).</span>
                 </div>
               {/if}
+            {/if}
+            {#if updateError && !updateInfo}
+              <div class="p-2 rounded-lg bg-amber-950/30 border border-amber-500/40 text-[11px] text-amber-300 flex items-center gap-1.5">
+                <span>⚠️ {updateError}</span>
+              </div>
             {/if}
           </div>
 

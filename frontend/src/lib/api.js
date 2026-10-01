@@ -417,6 +417,10 @@ export async function triggerGlinerDownload() {
 // --- Auto-Updater ---
 export async function checkAppUpdates(platform = '') {
   const base = getBase();
+  // If no backend available (standalone mobile), use direct GitHub API
+  if (base === null) {
+    return checkAppUpdatesDirect(platform);
+  }
   const query = platform ? `?platform=${encodeURIComponent(platform)}` : '';
   const res = await safeFetch(`${base}/api/updater/check${query}`, {}, 5000);
   return res && res.ok ? await res.json() : null;
@@ -427,3 +431,76 @@ export async function fetchAppVersion() {
   const res = await safeFetch(`${base}/api/updater/version`);
   return res && res.ok ? await res.json() : null;
 }
+
+/**
+ * Direct GitHub release check — works without any backend.
+ * Used on standalone mobile (phone app) where no Python server is running.
+ */
+export async function checkAppUpdatesDirect(platform = '') {
+  const GITHUB_REPO = 'Carxofa3/notes';
+  const currentVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0';
+
+  try {
+    const resp = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+      headers: { 'Accept': 'application/vnd.github.v3+json' },
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!resp.ok) return null;
+    const release = await resp.json();
+
+    const latestTag = (release.tag_name || '').replace(/^v/i, '');
+    const currentParts = currentVersion.split('.').map(Number);
+    const latestParts = latestTag.split('.').map(Number);
+
+    let updateAvailable = false;
+    for (let i = 0; i < Math.max(currentParts.length, latestParts.length); i++) {
+      const c = currentParts[i] || 0;
+      const l = latestParts[i] || 0;
+      if (l > c) { updateAvailable = true; break; }
+      if (l < c) break;
+    }
+
+    // Parse assets
+    const assets = (release.assets || []).map(a => ({
+      name: a.name,
+      size_mb: Math.round(a.size / (1024 * 1024) * 10) / 10,
+      size_bytes: a.size,
+      download_url: a.browser_download_url,
+      content_type: a.content_type || ''
+    }));
+
+    // Detect platform
+    const targetPlatform = platform || (/android/i.test(navigator.userAgent) ? 'android' : 'windows');
+
+    // Pick recommended asset
+    let recommended = null;
+    if (targetPlatform === 'android') {
+      recommended = assets.find(a => /universal/i.test(a.name) && a.name.endsWith('.apk'))
+        || assets.find(a => a.name.endsWith('.apk'));
+    } else if (targetPlatform === 'windows') {
+      recommended = assets.find(a => /windows\.exe/i.test(a.name) && !/setup/i.test(a.name))
+        || assets.find(a => /setup\.exe/i.test(a.name) || a.name.endsWith('.msi'))
+        || assets.find(a => a.name.endsWith('.exe'));
+    } else if (targetPlatform === 'linux') {
+      recommended = assets.find(a => a.name.endsWith('.AppImage'))
+        || assets.find(a => a.name.endsWith('.deb'));
+    }
+
+    return {
+      update_available: updateAvailable,
+      current_version: `v${currentVersion}`,
+      latest_version: release.tag_name?.startsWith('v') ? release.tag_name : `v${latestTag}`,
+      release_title: release.name || `Release ${release.tag_name}`,
+      published_at: release.published_at,
+      changelog: release.body || '',
+      html_url: release.html_url,
+      target_platform: targetPlatform,
+      recommended_asset: recommended,
+      all_assets: assets
+    };
+  } catch (e) {
+    console.warn('Direct GitHub update check failed:', e);
+    return null;
+  }
+}
+

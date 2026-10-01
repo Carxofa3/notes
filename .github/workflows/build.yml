@@ -267,17 +267,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG_NAME="v2.1.6"
-          TITLE="Notes Workstation v2.1.6 — Hotfix for Desktop Startup & Active Mesh Verification"
+          TAG_NAME="v2.1.7"
+          TITLE="Notes Workstation v2.1.7 — Fix Auto-Updater on Mobile & Dynamic Version"
           cat << 'EOF' > release_notes.md
-          ### Notes Workstation v2.1.6
+          ### Notes Workstation v2.1.7
 
           #### What's new in this release
 
-          - **Critical Hotfix for Windows Desktop Startup**: Resolved a fatal startup crash in `desktop.py` caused by a missing helper function and Windows console `cp1252` encoding incompatibility. `Notes-Workstation-Windows.exe` now starts up cleanly and stays running on port 5000 (or first free port).
-          - **Tailscale Mesh Recovery**: Added `--reset` to the automatic Tailscale startup routine to prevent configuration conflicts. Windows Tailscale automatically syncs with the mesh (`100.x.y.z`).
-          - **Live Endpoint Verification**: The Universal QR code only renders verified active endpoints (both local Wi-Fi and Tailscale), preventing client connection timeouts.
-          - **All Universal Pairing & CORS Features**: Includes the single Universal QR code, multi-route probing, full `flask-cors` integration, and cluster node management.
+          - **Fixed Auto-Updater on Mobile (Standalone)**: The "Check for Updates" button previously flickered and did nothing on the phone app because it tried to call a non-existent local backend. Now, when running standalone (no server), the updater calls the GitHub Releases API directly from the browser.
+          - **Dynamic Version Display**: The current app version is now baked into the frontend at build time from `app/version.py` (single source of truth), instead of being hardcoded. The UI always shows the correct version.
+          - **Update Error Feedback**: When the update check fails (e.g. no internet), a visible warning message is shown instead of silently flickering back.
+          - **Dev Proxy Port Fix**: Vite dev server proxy now targets port `58850` instead of the old `5000`.
 
           #### Downloads
 
