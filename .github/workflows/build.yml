@@ -263,43 +263,42 @@ jobs:
         run: |
           TAG_NAME="v2.1.1"
           TITLE="Notes Workstation v2.1.1 — In-App Camera QR Code Scanner & Remote Auto-Pairing"
-          NOTES="### Notes Workstation v2.1.1
+          cat << 'EOF' > release_notes.md
+          ### Notes Workstation v2.1.1
 
           #### What's new
 
-          - **In-App Camera QR Code Scanner**: Added a dedicated \`📷 Scan QR Code\` live camera viewfinder directly inside the Device Sync & Pairing modal! Supports phones, tablets, and laptops with webcams via \`html5-qrcode\`.
+          - **In-App Camera QR Code Scanner**: Added a dedicated `📷 Scan QR Code` live camera viewfinder directly inside the Device Sync & Pairing modal! Supports phones, tablets, and laptops with webcams via `html5-qrcode`.
           - **Instant Auto-Connect**: Scanning a Wi-Fi or Tailscale connection QR code instantly switches your mobile device backend URL, verifies connectivity, and synchronizes real-time P2P notes immediately without manual typing.
-          - **Smart Connect Field**: The manual connect box now intelligently parses both raw HTTP/HTTPS URLs (\`http://192.168.0.45:5000\`) and JSON cryptographic pairing tokens.
+          - **Smart Connect Field**: The manual connect box now intelligently parses both raw HTTP/HTTPS URLs (`http://192.168.0.45:5000`) and JSON cryptographic pairing tokens.
           - **GLiNER Neural NER**: On-demand download of the GLiNER model for academic entity extraction.
           - **Zero-config LAN Mesh Discovery**: UDP beacon on port 58856 auto-discovers all peers on the same network.
-          - **Tailscale Cross-Network Support**: Desktop app runs with \`--tailscale\` to connect across different networks.
-          - **High-Contrast Code Blocks**: Dracula-inspired palette (\`#0f1017\` background, vivid token colours)."
+          - **Tailscale Cross-Network Support**: Desktop app runs with `--tailscale` to connect across different networks.
+          - **High-Contrast Code Blocks**: Dracula-inspired palette (`#0f1017` background, vivid token colours).
 
           #### Downloads
 
           | Platform | File |
           |---|---|
-          | Windows (standalone EXE) | \`Notes-Workstation-Windows.exe\` |
-          | Windows (MSI installer) | \`*.msi\` |
-          | Linux (Deb package) | \`*.deb\` |
-          | Linux (AppImage) | \`*.AppImage\` |
-          | Android (Universal APK) | \`Notes-Workstation-Android-Universal-*.apk\` |
+          | Windows (standalone portable EXE) | `Notes-Workstation-Windows.exe` |
+          | Windows (MSI installer) | `*.msi` |
+          | Linux (Deb package) | `*.deb` |
+          | Linux (AppImage) | `*.AppImage` |
+          | Android (Universal APK) | `Notes-Workstation-Android-Universal-*.apk` |
 
           #### Usage — Tailscale cross-network
 
-          \`\`\`
+          ```powershell
           # Windows
           Notes-Workstation-Windows.exe --tailscale
 
           # Python (dev)
           python desktop.py --tailscale
-          \`\`\`
+          ```
 
-          The app will auto-start Tailscale, print your Tailscale IP, and display it in the connection-info block at startup. Share the \`http://100.x.x.x:5000\` URL with any device on your Tailnet."
+          The app will auto-start Tailscale, print your Tailscale IP, and display it in the connection-info block at startup. Share the `http://100.x.x.x:5000` URL with any device on your Tailnet.
+          EOF
 
-          gh release view "$TAG_NAME" \
-            || gh release create "$TAG_NAME" release-assets/* \
-               --title "$TITLE" \
-               --notes "$NOTES" \
-               --latest
+          gh release view "$TAG_NAME" || gh release create "$TAG_NAME" release-assets/* --title "$TITLE" --notes-file release_notes.md --latest
           gh release upload "$TAG_NAME" release-assets/* --clobber
+
