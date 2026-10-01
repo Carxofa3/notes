@@ -261,17 +261,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG_NAME="v2.1.0"
-          TITLE="Notes Workstation v2.1.0 — GLiNER NER, LAN Mesh & Tailscale Cross-Network"
-          NOTES="### Notes Workstation v2.1.0
+          TAG_NAME="v2.1.1"
+          TITLE="Notes Workstation v2.1.1 — In-App Camera QR Code Scanner & Remote Auto-Pairing"
+          NOTES="### Notes Workstation v2.1.1
 
           #### What's new
 
-          - **GLiNER Neural NER** — On-demand download of the GLiNER model for academic entity extraction. Integrated into the decision service with fallback to the regex engine. API endpoints: \`GET /gliner/status\`, \`POST /gliner/download\`, \`POST /gliner/extract\`, \`POST /gliner/lan-toggle\`.
-          - **Zero-config LAN Mesh Discovery** — UDP beacon on port 58856 auto-discovers all peers on the same network (inspired by LM Studio Nodes). See all discovered devices at \`GET /sync/discovered-nodes\`.
-          - **Tailscale Cross-Network Support** — Desktop app now ships with built-in Tailscale integration. Launch with \`--tailscale\` to automatically connect your device to your Tailnet for seamless cross-network access. Auth URL is printed (and opened in the browser) if the device is not yet authenticated. Connection info (LAN + Tailscale IPs) is displayed at startup.
-          - **High-Contrast Code Blocks** — Rewrote dark-theme code-box CSS with a vibrant Dracula-inspired palette (\`#0f1017\` background, vivid token colours). No more white-on-dark text.
-          - **GitHub Actions CI** — Added \`build-pyinstaller-windows\` job: frontend is built inside CI, bundled into a single-file \`Notes-Workstation-Windows.exe\` via PyInstaller, and uploaded as a release asset automatically.
+          - **In-App Camera QR Code Scanner**: Added a dedicated \`📷 Scan QR Code\` live camera viewfinder directly inside the Device Sync & Pairing modal! Supports phones, tablets, and laptops with webcams via \`html5-qrcode\`.
+          - **Instant Auto-Connect**: Scanning a Wi-Fi or Tailscale connection QR code instantly switches your mobile device backend URL, verifies connectivity, and synchronizes real-time P2P notes immediately without manual typing.
+          - **Smart Connect Field**: The manual connect box now intelligently parses both raw HTTP/HTTPS URLs (\`http://192.168.0.45:5000\`) and JSON cryptographic pairing tokens.
+          - **GLiNER Neural NER**: On-demand download of the GLiNER model for academic entity extraction.
+          - **Zero-config LAN Mesh Discovery**: UDP beacon on port 58856 auto-discovers all peers on the same network.
+          - **Tailscale Cross-Network Support**: Desktop app runs with \`--tailscale\` to connect across different networks.
+          - **High-Contrast Code Blocks**: Dracula-inspired palette (\`#0f1017\` background, vivid token colours)."
 
           #### Downloads
 

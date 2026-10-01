@@ -26,6 +26,7 @@
     "@tiptap/starter-kit": "^3.31.3",
     "codemirror": "^6.0.2",
     "codemirror-live-markdown": "^0.5.1-alpha.1",
+    "html5-qrcode": "^2.3.8",
     "katex": "^0.18.9",
     "lowlight": "^3.3.0",
     "lucide-svelte": "^1.0.1",

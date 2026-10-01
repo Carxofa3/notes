@@ -1,7 +1,8 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
   import QRCode from 'qrcode';
-  import { fetchPairInfo, fetchPeers, registerPeer, getServerUrl } from '../api.js';
+  import { Html5Qrcode } from 'html5-qrcode';
+  import { fetchPairInfo, fetchPeers, registerPeer, getServerUrl, setServerUrl } from '../api.js';
 
   let { isOpen = $bindable(false) } = $props();
 
@@ -13,6 +14,13 @@
   let isGeneratingQr = $state(false);
   let activeTab = $state('wifi'); // 'wifi' | 'tailscale'
   let copyFeedback = $state(false);
+  let isScanning = $state(false);
+  let scannerError = $state('');
+  let scannerInstance = null;
+
+  onDestroy(() => {
+    stopScanner();
+  });
 
   // Local fallback server URL
   const defaultHost = '192.168.0.45:5000';
@@ -104,10 +112,19 @@
   }
 
   async function handleConnectPeer() {
-    if (!inputToken.trim()) return;
+    const trimmed = inputToken.trim();
+    if (!trimmed) return;
     registerMessage = 'Pairing with peer...';
+
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      setServerUrl(trimmed);
+      registerMessage = `Successfully connected! Server set to ${trimmed}`;
+      await loadInfo();
+      return;
+    }
+
     try {
-      let parsed = JSON.parse(inputToken.trim());
+      let parsed = JSON.parse(trimmed);
       const res = await registerPeer(parsed);
       if (res && res.peer_id) {
         registerMessage = `Successfully paired with "${res.device_name}"!`;
@@ -117,13 +134,92 @@
         registerMessage = 'Failed to pair. Invalid peer payload.';
       }
     } catch (e) {
-      registerMessage = 'Error: Input must be a valid JSON pairing payload.';
+      registerMessage = 'Error: Input must be a valid server URL (e.g. http://192.168.0.45:5000) or JSON pairing payload.';
     }
+  }
+
+  async function startScanner() {
+    scannerError = '';
+    isScanning = true;
+    registerMessage = '';
+    await tick();
+    try {
+      const scanner = new Html5Qrcode('qr-reader');
+      scannerInstance = scanner;
+
+      await scanner.start(
+        { facingMode: 'environment' },
+        {
+          fps: 10,
+          qrbox: { width: 220, height: 220 },
+          aspectRatio: 1.0
+        },
+        async (decodedText) => {
+          if (navigator.vibrate) {
+            try { navigator.vibrate(100); } catch (_) {}
+          }
+          await stopScanner();
+          await handleScannedContent(decodedText);
+        },
+        () => {
+          // ignore frame reading noise
+        }
+      );
+    } catch (err) {
+      console.error('Failed to start camera scanner:', err);
+      scannerError = 'Camera access failed: ' + (err?.message || err);
+      isScanning = false;
+      scannerInstance = null;
+    }
+  }
+
+  async function stopScanner() {
+    if (scannerInstance) {
+      try {
+        if (scannerInstance.isScanning) {
+          await scannerInstance.stop();
+        }
+        scannerInstance.clear();
+      } catch (e) {
+        console.warn('Error stopping scanner:', e);
+      }
+      scannerInstance = null;
+    }
+    isScanning = false;
+  }
+
+  async function handleScannedContent(text) {
+    const trimmed = text.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      setServerUrl(trimmed);
+      registerMessage = `Connected! Server set to ${trimmed}`;
+      await loadInfo();
+    } else {
+      inputToken = trimmed;
+      try {
+        const parsed = JSON.parse(trimmed);
+        const res = await registerPeer(parsed);
+        if (res && res.peer_id) {
+          registerMessage = `Successfully paired with "${res.device_name}"!`;
+          inputToken = '';
+          await loadInfo();
+        } else {
+          registerMessage = 'Scanned code loaded. Click Pair below to finish.';
+        }
+      } catch {
+        registerMessage = `Scanned code: ${trimmed}`;
+      }
+    }
+  }
+
+  function handleCloseModal() {
+    stopScanner();
+    isOpen = false;
   }
 </script>
 
 {#if isOpen}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-2 sm:p-4" onclick={() => isOpen = false}>
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-2 sm:p-4" onclick={handleCloseModal}>
     <div 
       class="w-full max-w-2xl max-h-[90vh] rounded-2xl bg-[var(--surface)] border border-[var(--border)] shadow-2xl p-4 sm:p-6 flex flex-col gap-4 overflow-y-auto"
       onclick={(e) => e.stopPropagation()}
@@ -138,8 +234,8 @@
           <p class="text-xs text-[var(--text-secondary)]">Connect your Android phone or secondary computer to sync lecture notes in real time</p>
         </div>
         <button 
-          class="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xl p-1"
-          onclick={() => isOpen = false}
+          class="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xl p-1 cursor-pointer"
+          onclick={handleCloseModal}
         >&times;</button>
       </div>
 
@@ -147,14 +243,14 @@
       <div class="flex rounded-xl bg-[var(--bg-secondary)] p-1 border border-[var(--border)]">
         <button
           type="button"
-          class="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all {activeTab === 'wifi' ? 'bg-[var(--accent)] text-white shadow-xs' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}"
+          class="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all {activeTab === 'wifi' ? 'bg-[var(--accent)] text-white shadow-xs' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'} cursor-pointer"
           onclick={() => { activeTab = 'wifi'; updateQrCode(); }}
         >
           📡 Wi-Fi Quick Connect
         </button>
         <button
           type="button"
-          class="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all {activeTab === 'tailscale' ? 'bg-[var(--accent)] text-white shadow-xs' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}"
+          class="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all {activeTab === 'tailscale' ? 'bg-[var(--accent)] text-white shadow-xs' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'} cursor-pointer"
           onclick={() => { activeTab = 'tailscale'; updateQrCode(); }}
         >
           🔒 Tailscale P2P Mesh
@@ -163,7 +259,7 @@
 
       <!-- Main Pairing Section -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <!-- QR Code Card -->
+        <!-- QR Code Card (To be scanned by other devices) -->
         <div class="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] flex flex-col items-center justify-center gap-3 text-center">
           <span class="text-xs font-semibold text-[var(--text-primary)]">
             {activeTab === 'wifi' ? 'Scan to Connect via Home Wi-Fi' : 'Scan to Connect via Tailscale Mesh'}
@@ -186,7 +282,7 @@
               <span class="font-mono text-[var(--accent)] font-semibold text-xs break-all">
                 {getServerUrl() || `http://${defaultHost}`}
               </span>
-              <span class="text-[10px] text-[var(--text-secondary)]">Scan with your phone camera or enter in Settings</span>
+              <span class="text-[10px] text-[var(--text-secondary)]">Scan with your phone camera or the Scan button on the right</span>
             {:else}
               <span class="font-mono text-[var(--accent)] font-semibold text-xs break-all">
                 {pairInfo?.magic_dns || 'desktop.tailnet.ts.net'}
@@ -200,33 +296,67 @@
           <!-- Copy Button -->
           <button
             type="button"
-            class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--text-primary)] transition-colors flex items-center gap-1.5"
+            class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--text-primary)] transition-colors flex items-center gap-1.5 cursor-pointer"
             onclick={handleCopyPayload}
           >
             <span>{copyFeedback ? '✅ Copied to Clipboard!' : '📋 Copy Connection URL'}</span>
           </button>
         </div>
 
-        <!-- Manual Connect or Scan Form -->
+        <!-- Camera Scanner or Manual Connect Form -->
         <div class="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] flex flex-col gap-3">
-          <span class="text-xs font-semibold text-[var(--text-primary)]">Pair Remote Device (Android / Laptop)</span>
-          <p class="text-[11px] text-[var(--text-secondary)]">Paste the peer token or JSON payload scanned from your phone or secondary computer:</p>
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs font-semibold text-[var(--text-primary)]">Pair Remote Device</span>
+            <button
+              type="button"
+              class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer {isScanning ? 'bg-red-500/20 text-red-400 border border-red-500/40 hover:bg-red-500/30' : 'bg-[var(--accent)] text-white hover:opacity-90'}"
+              onclick={isScanning ? stopScanner : startScanner}
+            >
+              <span>{isScanning ? '⏹ Stop Scanner' : '📷 Scan QR Code'}</span>
+            </button>
+          </div>
+
+          {#if isScanning}
+            <div class="rounded-xl overflow-hidden border border-[var(--accent)] bg-black/95 p-3 flex flex-col items-center gap-2 shadow-inner">
+              <div id="qr-reader" class="w-full max-w-[240px] rounded-lg overflow-hidden bg-black"></div>
+              <span class="text-[11px] text-slate-300 font-medium animate-pulse">📷 Align camera over the QR code on PC</span>
+              <button
+                type="button"
+                class="text-[11px] text-red-400 hover:text-red-300 font-medium hover:underline cursor-pointer"
+                onclick={stopScanner}
+              >
+                Cancel Scanner
+              </button>
+            </div>
+          {/if}
+
+          {#if scannerError}
+            <div class="p-2.5 rounded-lg bg-red-950/40 border border-red-500/40 text-[11px] text-red-300 flex flex-col gap-1">
+              <span class="font-semibold">⚠️ Camera error</span>
+              <span>{scannerError}</span>
+              <span class="text-[10px] text-slate-400">Make sure camera permissions are granted, or paste the connection URL below.</span>
+            </div>
+          {/if}
+
+          <p class="text-[11px] text-[var(--text-secondary)]">Or paste the peer token or backend URL manually:</p>
 
           <textarea
             bind:value={inputToken}
-            placeholder={`{"magic_dns": "phone.tailnet.ts.net", "fingerprint": "ed25519:..."}`}
-            class="w-full flex-1 min-h-[90px] p-2.5 rounded-lg bg-[var(--card)] border border-[var(--border)] text-xs font-mono text-[var(--text-primary)] resize-none focus:outline-hidden focus:border-[var(--accent)]"
+            placeholder={`http://192.168.0.45:5000 or {"magic_dns": "...", "fingerprint": "..."}`}
+            class="w-full flex-1 min-h-[75px] p-2.5 rounded-lg bg-[var(--card)] border border-[var(--border)] text-xs font-mono text-[var(--text-primary)] resize-none focus:outline-hidden focus:border-[var(--accent)]"
           ></textarea>
 
           <button
-            class="px-4 py-2 rounded-lg text-xs font-semibold bg-[var(--accent)] text-white hover:opacity-90 transition-opacity"
+            class="px-4 py-2 rounded-lg text-xs font-semibold bg-[var(--accent)] text-white hover:opacity-90 transition-opacity cursor-pointer"
             onclick={handleConnectPeer}
           >
-            Pair & Pin Certificate
+            Connect & Pair Device
           </button>
 
           {#if registerMessage}
-            <span class="text-[11px] {registerMessage.includes('Error') || registerMessage.includes('Failed') ? 'text-red-400' : 'text-emerald-400'} font-mono">{registerMessage}</span>
+            <div class="p-2 rounded-lg border text-[11px] font-mono {registerMessage.includes('Error') || registerMessage.includes('Failed') ? 'bg-red-950/30 border-red-500/40 text-red-400' : 'bg-emerald-950/30 border-emerald-500/40 text-emerald-400'}">
+              {registerMessage}
+            </div>
           {/if}
         </div>
       </div>
@@ -257,8 +387,8 @@
       <!-- Footer -->
       <div class="flex justify-end pt-2 border-t border-[var(--border)]">
         <button
-          class="px-4 py-2 rounded-xl text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
-          onclick={() => isOpen = false}
+          class="px-4 py-2 rounded-xl text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] cursor-pointer"
+          onclick={handleCloseModal}
         >
           Done
         </button>
