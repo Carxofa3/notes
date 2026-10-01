@@ -267,13 +267,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG_NAME="v2.1.3"
-          TITLE="Notes Workstation v2.1.3 — Peer Cluster Model Hub, Hardware Specs & Auto-Updater"
+          TAG_NAME="v2.1.4"
+          TITLE="Notes Workstation v2.1.4 — Tailscale by Default, Cluster Model Hub & Auto-Updater"
           cat << 'EOF' > release_notes.md
-          ### Notes Workstation v2.1.3
+          ### Notes Workstation v2.1.4
 
           #### What's new in this release
 
+          - **Tailscale Enabled by Default (Zero Flags Needed)**: You no longer need to pass `--tailscale` when launching the desktop app or portable EXE! It now automatically checks and connects to Tailscale in an asynchronous daemon thread, launching the GUI instantly in < 0.5s. If you wish to disable it, pass `--no-tailscale`.
           - **Nodes & Peer Cluster Management UI (LM Studio Nodes Style)**: Added a dedicated `🖥️ Nodes & Models` dashboard to view, identify, and configure all devices across your LAN and Tailscale mesh.
           - **Configurable llama.cpp Service Exposure**: Expose your workstation's local `llama-server` (e.g. on port 8080) to the peer network with one click. Mobile phones and secondary laptops automatically route inference and contradiction resolution through a transparent reverse proxy without firewall hassles or separate port forwarding.
           - **Remote GLiNER Triggering**: Remotely trigger on-demand GLiNER model downloads on other peers and have them serve zero-shot entity extraction to your network.
