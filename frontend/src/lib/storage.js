@@ -92,7 +92,8 @@ export function setPairedConnection(payload, activeUrl) {
   const connection = {
     name: payload?.name || payload?.device_name || 'Notes Workstation',
     endpoints: [...new Set(endpoints)],
-    activeUrl: (activeUrl || endpoints[0] || '').replace(/\/+$/, '')
+    activeUrl: (activeUrl || endpoints[0] || '').replace(/\/+$/, ''),
+    accessToken: payload?.access_token || ''
   };
   localStorage.setItem(STORAGE_KEYS.PAIRED_CONNECTION, JSON.stringify(connection));
   if (connection.activeUrl) setServerUrl(connection.activeUrl);

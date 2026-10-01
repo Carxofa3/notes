@@ -60,8 +60,9 @@ function getBase() {
   return '';
 }
 
-async function safeFetch(url, options = {}, timeoutMs = 1500) {
+async function safeFetch(url, options = {}, timeoutMs = 1500, explicitAccessToken = '') {
   const connection = getPairedConnection();
+  const accessToken = explicitAccessToken || connection?.accessToken || '';
   const active = connection?.activeUrl || getServerUrl();
   const path = active && url.startsWith(active) ? url.slice(active.length) : null;
   const endpoints = path && connection?.endpoints?.length
@@ -73,7 +74,9 @@ async function safeFetch(url, options = {}, timeoutMs = 1500) {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const res = await fetch(target, { ...options, signal: controller.signal });
+      const headers = new Headers(options.headers || {});
+      if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+      const res = await fetch(target, { ...options, headers, signal: controller.signal });
       clearTimeout(id);
       if (res.ok && endpoint && endpoint !== active) setActivePairedEndpoint(endpoint);
       return res;
@@ -328,11 +331,11 @@ export async function synthesizeLectureNotes(content) {
 }
 
 // --- Tailscale Peer-to-Peer Sync ---
-export async function probeServer(candidateUrl, timeoutMs = 1500) {
+export async function probeServer(candidateUrl, timeoutMs = 1500, accessToken = '') {
   try {
     const clean = (candidateUrl || '').replace(/\/+$/, '');
     if (!clean) return { ok: false, url: '' };
-    const res = await safeFetch(`${clean}/api/sync/pair-info`, {}, timeoutMs);
+    const res = await safeFetch(`${clean}/api/sync/pair-info`, {}, timeoutMs, accessToken);
     if (res && res.ok) {
       const data = await res.json();
       return { ok: true, data, url: clean };

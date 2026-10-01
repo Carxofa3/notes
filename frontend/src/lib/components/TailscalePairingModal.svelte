@@ -415,7 +415,7 @@
       // Stage 1: Probe local Wi-Fi / LAN first with 1.2s timeout (fastest route)
       for (const cand of uniqueCandidates) {
         registerMessage = `Testing ${cand.name} (${cand.url})...`;
-        const probe = await probeServer(cand.url, 1200);
+        const probe = await probeServer(cand.url, 1200, payload.access_token || '');
         if (probe.ok) {
           winner = cand;
           break;
@@ -427,7 +427,7 @@
         for (const cand of uniqueCandidates) {
           if (cand.name.toLowerCase().includes('tailscale') || cand.url.includes('100.')) {
             registerMessage = `Testing Tailscale route (${cand.url})...`;
-            const probe = await probeServer(cand.url, 3000);
+            const probe = await probeServer(cand.url, 3000, payload.access_token || '');
             if (probe.ok) {
               winner = cand;
               break;

@@ -1,6 +1,6 @@
 # app/api/sync.py
 import base64
-from flask import request
+from flask import current_app, request
 from flask_restx import Namespace, Resource, fields
 from app.services.sync_service import sync_service
 
@@ -24,7 +24,9 @@ crdt_delta_model = ns.model('CrdtDeltaInput', {
 class PairInfo(Resource):
     def get(self):
         """Get local device Tailscale pairing information and QR code payload"""
-        return sync_service.get_device_info(), 200
+        info = sync_service.get_device_info()
+        info["pairing_payload"]["access_token"] = current_app.config["PAIRING_ACCESS_TOKEN"]
+        return info, 200
 
 @ns.route('/peers')
 class PeerList(Resource):
@@ -81,4 +83,3 @@ class DiscoveredNodes(Resource):
             'nodes': sync_service.get_discovered_nodes(),
             'local_device': sync_service.get_device_info()
         }, 200
-

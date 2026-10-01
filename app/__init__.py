@@ -3,6 +3,7 @@ from flask_migrate import Migrate
 from flask_cors import CORS
 from .database import db
 from config.config import config
+from .security import load_or_create_pairing_token, protect_remote_api
 import os
 
 migrate = Migrate()
@@ -12,9 +13,20 @@ def create_app(config_name='default'):
                 template_folder='templates',
                 static_folder='static')
     app.config.from_object(config[config_name])
+    app.config["PAIRING_ACCESS_TOKEN"] = load_or_create_pairing_token()
 
-    # Enable CORS for all routes (essential for Android mobile app & remote peer mesh)
-    CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+    app.before_request(protect_remote_api)
+
+    # Cross-origin mobile requests use explicit bearer tokens, never cookies.
+    CORS(app, resources={
+        r"/*": {
+            "origins": [
+                "http://tauri.localhost",
+                "tauri://localhost",
+                r"^https?://(localhost|127\.0\.0\.1):588[5-9][0-9]$"
+            ]
+        }
+    }, supports_credentials=False)
 
     db.init_app(app)
     migrate.init_app(app, db)

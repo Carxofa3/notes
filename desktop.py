@@ -118,7 +118,7 @@ def create_flask_server(app, host='0.0.0.0', preferred_port=58850, max_attempts=
     raise RuntimeError(f"Could not bind Flask backend to any port in range 58850-{58850+max_attempts}")
 
 
-def start_sync_server(root_dir, port=58855):
+def start_sync_server(root_dir, port=58855, access_token=''):
     """Optionally start node sync_server.js if Node.js is present."""
     sync_script = os.path.join(root_dir, 'sync_server.js')
     if not os.path.exists(sync_script):
@@ -126,6 +126,7 @@ def start_sync_server(root_dir, port=58855):
     try:
         env = os.environ.copy()
         env['SYNC_PORT'] = str(port)
+        env['NOTES_SYNC_TOKEN'] = access_token
         proc = subprocess.Popen(
             ['node', sync_script],
             cwd=root_dir,
@@ -319,15 +320,20 @@ def main():
     # Do not attempt to install, start, or authenticate Tailscale. Use it only
     # when the user has already configured the client; LAN remains available.
 
-    # 2. Start Yjs P2P sync server in background
+    # 2. Configure the backend before starting the authenticated sync listener.
     sync_port = args.sync_port or find_free_port(58855)
-    sync_proc = start_sync_server(root_dir, sync_port)
-    if sync_proc:
-        print(f"[Desktop] P2P Yjs WebSocket sync server active on ws://0.0.0.0:{sync_port}")
-
     # 3. Import and start Flask app on a guaranteed free port
     from app import create_app
     flask_app = create_app(os.getenv('FLASK_CONFIG') or 'default')
+
+    # 4. Start Yjs sync only with the same secret embedded in the local pairing QR.
+    sync_proc = start_sync_server(
+        root_dir,
+        sync_port,
+        flask_app.config['PAIRING_ACCESS_TOKEN']
+    )
+    if sync_proc:
+        print(f"[Desktop] Authenticated P2P Yjs WebSocket listener active on port {sync_port}")
 
     server, flask_port = create_flask_server(flask_app, host='0.0.0.0', preferred_port=args.port or 58850)
     local_check_url = f"http://127.0.0.1:{flask_port}"

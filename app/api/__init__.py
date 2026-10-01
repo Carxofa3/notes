@@ -21,7 +21,8 @@ authorizations = {
     'apikey': {
         'type': 'apiKey',
         'in': 'header',
-        'name': 'X-API-KEY'
+        'name': 'Authorization',
+        'description': 'Bearer token provided in the desktop pairing QR code'
     }
 }
 
@@ -47,4 +48,3 @@ api.add_namespace(decide_ns, path='/decide')
 api.add_namespace(gliner_ns, path='/gliner')
 api.add_namespace(nodes_ns, path='/nodes')
 api.add_namespace(updater_ns, path='/updater')
-

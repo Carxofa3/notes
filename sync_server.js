@@ -6,6 +6,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import http from 'http';
 import * as Y from 'yjs';
+import { timingSafeEqual } from 'crypto';
 
 const PORT = process.env.SYNC_PORT || 58855;
 const HOST = '0.0.0.0';
@@ -66,7 +67,22 @@ const server = http.createServer((req, res) => {
   res.end();
 });
 
-const wss = new WebSocketServer({ server });
+const expectedToken = Buffer.from(process.env.NOTES_SYNC_TOKEN || '');
+const wss = new WebSocketServer({
+  server,
+  verifyClient: (info, done) => {
+    const offered = (info.req.headers['sec-websocket-protocol'] || '')
+      .split(',')
+      .map((value) => value.trim());
+    const suppliedProtocol = offered.find((value) => value.startsWith('notes-auth.')) || '';
+    const suppliedToken = Buffer.from(suppliedProtocol.slice('notes-auth.'.length));
+    const valid = expectedToken.length > 0
+      && suppliedToken.length === expectedToken.length
+      && timingSafeEqual(suppliedToken, expectedToken);
+    done(valid, valid ? 101 : 401, valid ? 'Paired device' : 'Pairing required');
+  },
+  handleProtocols: (protocols) => protocols.has('notes') ? 'notes' : false
+});
 
 wss.on('connection', (ws, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);

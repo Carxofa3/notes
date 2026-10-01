@@ -77,5 +77,9 @@ src-tauri/gen/android/
 target/
 release-dist/
 *.spec
+release.keystore
+*.jks
+*.p12
+.private/
 
 
