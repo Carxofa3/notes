@@ -25,7 +25,7 @@ class TailscaleSyncService:
     """
 
     DEFAULT_PORT = 58855
-    FLASK_PORT = 5000
+    FLASK_PORT = int(os.environ.get("FLASK_PORT", 58850))
 
     def __init__(self):
         self._discovered_nodes: Dict[str, Dict[str, Any]] = {}

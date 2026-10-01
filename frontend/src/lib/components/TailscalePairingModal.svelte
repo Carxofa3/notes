@@ -62,8 +62,6 @@
     stopClusterPolling();
   });
 
-  const defaultHost = '192.168.0.45:5000';
-
   $effect(() => {
     if (isOpen) {
       currentServerUrl = getServerUrl();
@@ -138,30 +136,33 @@
       let payloadToEncode = '';
       if (pairInfo && pairInfo.pairing_payload) {
         payloadToEncode = JSON.stringify(pairInfo.pairing_payload);
-      } else if (pairInfo) {
+      } else if (pairInfo && (pairInfo.lan_url || pairInfo.lan_ip || pairInfo.tailscale_url)) {
+        const port = pairInfo.http_port || 58850;
         payloadToEncode = JSON.stringify({
           type: 'NOTES_PAIR',
           v: 2,
           name: pairInfo.device_name || 'Desktop Workstation',
-          lan_url: pairInfo.lan_ip ? `http://${pairInfo.lan_ip}:${pairInfo.http_port || 5000}` : `http://${defaultHost}`,
-          tailscale_url: pairInfo.tailscale_ip ? `http://${pairInfo.tailscale_ip}:${pairInfo.http_port || 5000}` : null,
-          lan_ip: pairInfo.lan_ip || '192.168.0.45',
+          lan_url: pairInfo.lan_url || (pairInfo.lan_ip ? `http://${pairInfo.lan_ip}:${port}` : null),
+          tailscale_url: pairInfo.tailscale_url || (pairInfo.tailscale_ip ? `http://${pairInfo.tailscale_ip}:${port}` : null),
+          lan_ip: pairInfo.lan_ip || null,
           tailscale_ip: pairInfo.tailscale_ip || null,
-          http_port: pairInfo.http_port || 5000,
+          http_port: port,
           fingerprint: pairInfo.fingerprint || 'local'
         });
       } else {
         const customUrl = getServerUrl();
-        payloadToEncode = JSON.stringify({
-          type: 'NOTES_PAIR',
-          v: 2,
-          name: 'Desktop Workstation',
-          lan_url: customUrl || `http://${defaultHost}`,
-          tailscale_url: null,
-          lan_ip: '192.168.0.45',
-          tailscale_ip: null,
-          http_port: 5000
-        });
+        if (customUrl) {
+          payloadToEncode = JSON.stringify({
+            type: 'NOTES_PAIR',
+            v: 2,
+            name: 'Notes Workstation',
+            lan_url: customUrl,
+            tailscale_url: null
+          });
+        } else {
+          qrDataUrl = '';
+          return;
+        }
       }
 
       const url = await QRCode.toDataURL(payloadToEncode, {
@@ -277,7 +278,7 @@
 
   async function handleTriggerRemoteGliner(peer) {
     if (!peer.lan_ip && !peer.sender_ip) return;
-    const peerUrl = `http://${peer.lan_ip || peer.sender_ip}:${peer.http_port || 5000}`;
+    const peerUrl = `http://${peer.lan_ip || peer.sender_ip}:${peer.http_port || 58850}`;
     clusterMessage = `Sending download trigger to ${peer.name || peer.node_id}...`;
     try {
       const res = await triggerRemoteGliner(peer.node_id, peerUrl);
@@ -403,12 +404,13 @@
       registerMessage = `🔍 Discovered "${hostName}"! Probing connection...`;
 
       // Extract candidate URLs in order of priority (LAN Wi-Fi first, then Tailscale mesh)
+      const port = payload.http_port || payload.port || 58850;
       const candidates = [];
       if (payload.lan_url) candidates.push({ name: 'Home Wi-Fi', url: payload.lan_url.replace(/\/+$/, '') });
       if (payload.tailscale_url) candidates.push({ name: 'Tailscale Mesh', url: payload.tailscale_url.replace(/\/+$/, '') });
-      if (payload.lan_ip) candidates.push({ name: 'LAN IP', url: `http://${payload.lan_ip}:${payload.http_port || 5000}` });
-      if (payload.tailscale_ip || payload.ip) candidates.push({ name: 'Tailscale IP', url: `http://${payload.tailscale_ip || payload.ip}:${payload.http_port || payload.port || 5000}` });
-      if (payload.magic_dns) candidates.push({ name: 'MagicDNS', url: `http://${payload.magic_dns}:${payload.http_port || payload.port || 5000}` });
+      if (payload.lan_ip) candidates.push({ name: 'LAN IP', url: `http://${payload.lan_ip}:${port}` });
+      if (payload.tailscale_ip || payload.ip) candidates.push({ name: 'Tailscale IP', url: `http://${payload.tailscale_ip || payload.ip}:${port}` });
+      if (payload.magic_dns) candidates.push({ name: 'MagicDNS', url: `http://${payload.magic_dns}:${port}` });
 
       const uniqueCandidates = [];
       const seenUrls = new Set();
@@ -917,10 +919,16 @@
             <div class="bg-white rounded-2xl p-3 flex flex-col items-center justify-center shadow-md border border-slate-200">
               {#if qrDataUrl}
                 <img src={qrDataUrl} alt="Universal Pairing QR Code" class="w-48 h-48 rounded-lg object-contain" />
-              {:else}
+              {:else if isGeneratingQr}
                 <div class="w-48 h-48 flex flex-col items-center justify-center text-slate-400 gap-2">
                   <span class="text-2xl animate-spin">⏳</span>
                   <span class="text-xs font-medium">Generating QR...</span>
+                </div>
+              {:else}
+                <div class="w-48 h-48 flex flex-col items-center justify-center text-slate-400 gap-2 text-center p-2">
+                  <span class="text-3xl">📱</span>
+                  <span class="text-xs font-semibold text-slate-700">Client / Standalone</span>
+                  <span class="text-[10px] text-slate-500 leading-tight">Tap "Scan QR Code" on the right to pair with your PC.</span>
                 </div>
               {/if}
             </div>
@@ -930,11 +938,17 @@
               <!-- LAN / Wi-Fi route -->
               <div class="flex items-center justify-between gap-1 text-[11px]">
                 <div class="flex items-center gap-1.5">
-                  <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  <span class="w-2 h-2 rounded-full {pairInfo?.lan_url ? 'bg-emerald-400' : 'bg-slate-500'}"></span>
                   <span class="text-[var(--text-secondary)]">🏠 Local Wi-Fi:</span>
                 </div>
                 <span class="font-mono font-medium text-[var(--text-primary)] truncate">
-                  {pairInfo?.lan_url || `http://${defaultHost}`}
+                  {#if pairInfo?.lan_url}
+                    {pairInfo.lan_url}
+                  {:else if currentServerUrl}
+                    {currentServerUrl}
+                  {:else}
+                    <span class="text-[var(--text-secondary)] italic">Detecting...</span>
+                  {/if}
                 </span>
               </div>
 
@@ -946,9 +960,9 @@
                 </div>
                 <span class="font-mono font-medium text-[var(--text-primary)] truncate">
                   {#if pairInfo?.tailscale_ip}
-                    {pairInfo.tailscale_url || `http://${pairInfo.tailscale_ip}:5000`}
+                    {pairInfo.tailscale_url || `http://${pairInfo.tailscale_ip}:${pairInfo.http_port || 58850}`}
                   {:else}
-                    <span class="text-[var(--text-secondary)] italic">Starting mesh...</span>
+                    <span class="text-[var(--text-secondary)] italic">Offline / Not detected</span>
                   {/if}
                 </span>
               </div>

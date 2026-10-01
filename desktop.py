@@ -43,7 +43,7 @@ def wait_for_server(url, timeout=10):
     return False
 
 
-def find_free_port(start_port=5000, max_attempts=50):
+def find_free_port(start_port=58850, max_attempts=50):
     """Find an available TCP port starting from start_port."""
     for port in range(start_port, start_port + max_attempts):
         # 1. Probe if another process is actively listening
@@ -67,18 +67,18 @@ def find_free_port(start_port=5000, max_attempts=50):
     return start_port
 
 
-def create_flask_server(app, host='0.0.0.0', preferred_port=5000, max_attempts=50):
+def create_flask_server(app, host='0.0.0.0', preferred_port=58850, max_attempts=50):
     """
     Directly bind Werkzeug WSGI server to an available port.
-    If preferred_port (e.g. 5000) is in use, automatically tries subsequent ports
-    (5001, 5002, ...) until an open port is secured.
+    If preferred_port (e.g. 58850) is in use, automatically tries subsequent ports
+    (58851, 58852, ...) until an open port is secured.
     """
     from werkzeug.serving import make_server
 
     ports_to_try = []
     if preferred_port:
         ports_to_try.append(preferred_port)
-    ports_to_try.extend(range(5000, 5000 + max_attempts))
+    ports_to_try.extend(range(58850, 58850 + max_attempts))
     
     seen = set()
     ordered_ports = [p for p in ports_to_try if not (p in seen or seen.add(p))]
@@ -99,7 +99,7 @@ def create_flask_server(app, host='0.0.0.0', preferred_port=5000, max_attempts=5
         except (OSError, socket.error):
             continue
 
-    raise RuntimeError(f"Could not bind Flask backend to any port in range 5000-{5000+max_attempts}")
+    raise RuntimeError(f"Could not bind Flask backend to any port in range 58850-{58850+max_attempts}")
 
 
 def start_sync_server(root_dir, port=58855):
@@ -305,7 +305,7 @@ def main():
     from app import create_app
     flask_app = create_app(os.getenv('FLASK_CONFIG') or 'default')
 
-    server, flask_port = create_flask_server(flask_app, host='0.0.0.0', preferred_port=args.port or 5000)
+    server, flask_port = create_flask_server(flask_app, host='0.0.0.0', preferred_port=args.port or 58850)
     local_check_url = f"http://127.0.0.1:{flask_port}"
 
     # Inform discovery beacon of actual HTTP port
