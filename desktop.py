@@ -16,8 +16,32 @@ import subprocess
 import urllib.request
 import webbrowser
 
+# Ensure Windows stdout/stderr handles UTF-8 without charmap crashes
+if sys.platform == 'win32':
+    try:
+        if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
+            sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        if sys.stderr and hasattr(sys.stderr, 'reconfigure'):
+            sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
+
+def wait_for_server(url, timeout=10):
+    """Wait until the backend server is responding to HTTP requests."""
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'NotesDesktopCheck/1.0'})
+            with urllib.request.urlopen(req, timeout=1.0) as resp:
+                if resp.status in (200, 404):
+                    return True
+        except Exception:
+            time.sleep(0.2)
+    return False
+
 
 def find_free_port(start_port=5000, max_attempts=50):
     """Find an available TCP port starting from start_port."""
@@ -181,7 +205,7 @@ def start_tailscale(background=True):
         backend_state = data.get('BackendState', '')
         if backend_state == 'Running':
             ts_ip = get_tailscale_ip() or 'unknown'
-            print(f"[Desktop] ✓ Tailscale connected. Cross-network IP: {ts_ip}")
+            print(f"[Desktop] [OK] Tailscale connected. Cross-network IP: {ts_ip}")
             return True
     except Exception:
         pass
@@ -191,7 +215,7 @@ def start_tailscale(background=True):
         print("[Desktop] Bringing up Tailscale for cross-network mesh...")
         try:
             proc = subprocess.Popen(
-                [ts, 'up', '--accept-routes'],
+                [ts, 'up', '--reset', '--accept-routes'],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True
@@ -200,14 +224,14 @@ def start_tailscale(background=True):
                 line = line.strip()
                 if line:
                     if line.startswith('https://'):
-                        print(f"[Desktop] 🔐 Tailscale auth required: {line}")
+                        print(f"[Desktop] Tailscale auth required: {line}")
                         webbrowser.open(line)
                     else:
                         print(f"[Desktop]    {line}")
             proc.wait(timeout=120)
             if proc.returncode == 0:
                 ts_ip = get_tailscale_ip() or 'unknown'
-                print(f"[Desktop] ✓ Tailscale connected. Cross-network IP: {ts_ip}")
+                print(f"[Desktop] [OK] Tailscale connected. Cross-network IP: {ts_ip}")
         except Exception as e:
             print(f"[Desktop] Tailscale background notice: {e}")
 
@@ -235,9 +259,10 @@ def print_connection_info(flask_port):
 
     ts_ip = get_tailscale_ip()
 
-    print("\n" + "─" * 55)
-    print("  Notes Workstation — Connection Info")
-    print("─" * 55)
+    sep = "-" * 55
+    print("\n" + sep)
+    print("  Notes Workstation -- Connection Info")
+    print(sep)
     print(f"  Local:      http://localhost:{flask_port}")
     for ip in lan_ips:
         print(f"  LAN:        http://{ip}:{flask_port}")
@@ -245,7 +270,7 @@ def print_connection_info(flask_port):
         print(f"  Tailscale:  http://{ts_ip}:{flask_port}  (cross-network active!)")
     else:
         print("  Tailscale:  auto-connecting in background (pass --no-tailscale to skip)")
-    print("─" * 55 + "\n")
+    print(sep + "\n")
 
 
 # ─── Main ────────────────────────────────────────────────────────────────────

@@ -267,19 +267,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG_NAME="v2.1.5"
-          TITLE="Notes Workstation v2.1.5 — Universal One-QR Pairing & Cross-Origin Sync"
+          TAG_NAME="v2.1.6"
+          TITLE="Notes Workstation v2.1.6 — Hotfix for Desktop Startup & Active Mesh Verification"
           cat << 'EOF' > release_notes.md
-          ### Notes Workstation v2.1.5
+          ### Notes Workstation v2.1.6
 
           #### What's new in this release
 
-          - **Universal One-QR Pairing ("Boom, Connected")**: Eliminated the confusing two-tab Wi-Fi vs Tailscale QR codes. Now you get ONE single universal QR code on your computer screen. Open the camera on your phone, point it at the screen, and both devices automatically connect and verify each other.
-          - **Multi-Route Auto-Probing**: The mobile client parses the universal pairing payload and tests the local Wi-Fi route first (ultra-low latency). If you are on cellular LTE or outside home, it seamlessly falls back to your encrypted Tailscale mesh.
-          - **Full Cross-Origin CORS Support**: Initialized `flask-cors` across all API endpoints, completely eliminating "Invalid peer payload" network rejections when connecting from Android mobile WebViews.
-          - **Automatic Tailscale Tray Integration**: Desktop launcher automatically detects and launches `tailscale-ipn.exe` on Windows so the Tailscale icon is always accessible in your system tray.
-          - **Seamless Workspace Sync**: As soon as pairing completes, the mobile client immediately refreshes and pulls all courses, units, and notes from the workstation.
-          - **All v2.1.4 Cluster & Node Management**: Includes configurable llama.cpp proxying, GLiNER neural entity extraction, custom device aliases, hardware specs badges, and built-in auto-updater.
+          - **Critical Hotfix for Windows Desktop Startup**: Resolved a fatal startup crash in `desktop.py` caused by a missing helper function and Windows console `cp1252` encoding incompatibility. `Notes-Workstation-Windows.exe` now starts up cleanly and stays running on port 5000 (or first free port).
+          - **Tailscale Mesh Recovery**: Added `--reset` to the automatic Tailscale startup routine to prevent configuration conflicts. Windows Tailscale automatically syncs with the mesh (`100.x.y.z`).
+          - **Live Endpoint Verification**: The Universal QR code only renders verified active endpoints (both local Wi-Fi and Tailscale), preventing client connection timeouts.
+          - **All Universal Pairing & CORS Features**: Includes the single Universal QR code, multi-route probing, full `flask-cors` integration, and cluster node management.
 
           #### Downloads
 
