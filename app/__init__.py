@@ -1,5 +1,6 @@
 from flask import Flask, Blueprint, send_from_directory, render_template
 from flask_migrate import Migrate
+from flask_cors import CORS
 from .database import db
 from config.config import config
 import os
@@ -11,6 +12,9 @@ def create_app(config_name='default'):
                 template_folder='templates',
                 static_folder='static')
     app.config.from_object(config[config_name])
+
+    # Enable CORS for all routes (essential for Android mobile app & remote peer mesh)
+    CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
     db.init_app(app)
     migrate.init_app(app, db)

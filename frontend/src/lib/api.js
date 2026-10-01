@@ -310,25 +310,41 @@ export async function synthesizeLectureNotes(content) {
 }
 
 // --- Tailscale Peer-to-Peer Sync ---
-export async function fetchPairInfo() {
-  const base = getBase();
+export async function probeServer(candidateUrl, timeoutMs = 1500) {
+  try {
+    const clean = (candidateUrl || '').replace(/\/+$/, '');
+    if (!clean) return { ok: false, url: '' };
+    const res = await safeFetch(`${clean}/api/sync/pair-info`, {}, timeoutMs);
+    if (res && res.ok) {
+      const data = await res.json();
+      return { ok: true, data, url: clean };
+    }
+  } catch (_) {}
+  return { ok: false, url: candidateUrl };
+}
+
+export async function fetchPairInfo(targetServerUrl = null) {
+  const base = targetServerUrl ? targetServerUrl.replace(/\/+$/, '') : getBase();
+  if (base === null) return null;
   const res = await safeFetch(`${base}/api/sync/pair-info`);
   return res && res.ok ? await res.json() : null;
 }
 
-export async function fetchPeers() {
-  const base = getBase();
+export async function fetchPeers(targetServerUrl = null) {
+  const base = targetServerUrl ? targetServerUrl.replace(/\/+$/, '') : getBase();
+  if (base === null) return [];
   const res = await safeFetch(`${base}/api/sync/peers`);
   return res && res.ok ? await res.json() : [];
 }
 
-export async function registerPeer(peerData) {
-  const base = getBase();
+export async function registerPeer(peerData, targetServerUrl = null) {
+  const base = targetServerUrl ? targetServerUrl.replace(/\/+$/, '') : getBase();
+  if (!base) return null;
   const res = await safeFetch(`${base}/api/sync/peers`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(peerData)
-  });
+  }, 4000);
   return res && res.ok ? await res.json() : null;
 }
 

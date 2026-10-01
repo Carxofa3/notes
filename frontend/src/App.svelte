@@ -71,8 +71,16 @@
 
   onMount(async () => {
     await loadInitialData();
+
+    const handleServerChange = async () => {
+      await loadInitialData();
+    };
+    window.addEventListener('notes-server-changed', handleServerChange);
     window.addEventListener('keydown', handleGlobalKeydown);
-    return () => window.removeEventListener('keydown', handleGlobalKeydown);
+    return () => {
+      window.removeEventListener('notes-server-changed', handleServerChange);
+      window.removeEventListener('keydown', handleGlobalKeydown);
+    };
   });
 
   async function loadInitialData() {

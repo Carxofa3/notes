@@ -267,23 +267,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG_NAME="v2.1.4"
-          TITLE="Notes Workstation v2.1.4 — Tailscale by Default, Cluster Model Hub & Auto-Updater"
+          TAG_NAME="v2.1.5"
+          TITLE="Notes Workstation v2.1.5 — Universal One-QR Pairing & Cross-Origin Sync"
           cat << 'EOF' > release_notes.md
-          ### Notes Workstation v2.1.4
+          ### Notes Workstation v2.1.5
 
           #### What's new in this release
 
-          - **Tailscale Enabled by Default (Zero Flags Needed)**: You no longer need to pass `--tailscale` when launching the desktop app or portable EXE! It now automatically checks and connects to Tailscale in an asynchronous daemon thread, launching the GUI instantly in < 0.5s. If you wish to disable it, pass `--no-tailscale`.
-          - **Nodes & Peer Cluster Management UI (LM Studio Nodes Style)**: Added a dedicated `🖥️ Nodes & Models` dashboard to view, identify, and configure all devices across your LAN and Tailscale mesh.
-          - **Configurable llama.cpp Service Exposure**: Expose your workstation's local `llama-server` (e.g. on port 8080) to the peer network with one click. Mobile phones and secondary laptops automatically route inference and contradiction resolution through a transparent reverse proxy without firewall hassles or separate port forwarding.
-          - **Remote GLiNER Triggering**: Remotely trigger on-demand GLiNER model downloads on other peers and have them serve zero-shot entity extraction to your network.
-          - **Custom Peer Names & Aliases**: Assign friendly names to any peer in your cluster (e.g. *"Workstation RTX 4090"*, *"Study Laptop"*, *"Galaxy S24"*).
-          - **Lightweight Hardware Specifications**: Automatic detection of each peer's RAM (total/available) and GPU + VRAM (e.g. `RTX 3080 (10 GB VRAM) • 32 GB RAM` or `Intel Iris Xe • 16 GB RAM`) with zero heavy dependencies (no psutil or torch drivers required for querying).
-          - **Smart Auto-Updater**: Built-in release detector checks GitHub releases and automatically identifies the exact right asset for your platform (Windows portable EXE, Windows setup, Android APK, Linux AppImage/Deb) with a 1-click download button and changelog preview.
-          - **Automatic Port Conflict Resolution**: Automatically seeks available ports (5000 -> 5001...) if a port is in use.
-          - **Persistent Storage**: Retains SQLite database across restarts in `~/.notes_workstation/notes.db`.
-          - **In-App Camera QR Scanner**: Instant live camera viewfinder with native Android camera permission bridge.
+          - **Universal One-QR Pairing ("Boom, Connected")**: Eliminated the confusing two-tab Wi-Fi vs Tailscale QR codes. Now you get ONE single universal QR code on your computer screen. Open the camera on your phone, point it at the screen, and both devices automatically connect and verify each other.
+          - **Multi-Route Auto-Probing**: The mobile client parses the universal pairing payload and tests the local Wi-Fi route first (ultra-low latency). If you are on cellular LTE or outside home, it seamlessly falls back to your encrypted Tailscale mesh.
+          - **Full Cross-Origin CORS Support**: Initialized `flask-cors` across all API endpoints, completely eliminating "Invalid peer payload" network rejections when connecting from Android mobile WebViews.
+          - **Automatic Tailscale Tray Integration**: Desktop launcher automatically detects and launches `tailscale-ipn.exe` on Windows so the Tailscale icon is always accessible in your system tray.
+          - **Seamless Workspace Sync**: As soon as pairing completes, the mobile client immediately refreshes and pulls all courses, units, and notes from the workstation.
+          - **All v2.1.4 Cluster & Node Management**: Includes configurable llama.cpp proxying, GLiNER neural entity extraction, custom device aliases, hardware specs badges, and built-in auto-updater.
 
           #### Downloads
 
@@ -295,14 +291,14 @@ jobs:
           | Linux (AppImage) | `*.AppImage` |
           | Android (Universal APK) | `Notes-Workstation-Android-Universal-*.apk` |
 
-          #### Usage — Tailscale cross-network
+          #### Usage
 
           ```powershell
           # Windows
-          Notes-Workstation-Windows.exe --tailscale
+          Notes-Workstation-Windows.exe
 
           # Python (dev)
-          python desktop.py --tailscale
+          python desktop.py
           ```
           EOF
 

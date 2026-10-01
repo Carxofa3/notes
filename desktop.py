@@ -133,6 +133,25 @@ def get_tailscale_ip():
     return None
 
 
+def _ensure_tailscale_tray():
+    """On Windows, ensure the Tailscale system tray application (tailscale-ipn.exe) is launched."""
+    if sys.platform != 'win32':
+        return
+    ipn_candidates = [
+        r"C:\Program Files\Tailscale\tailscale-ipn.exe",
+        r"C:\Program Files (x86)\Tailscale\tailscale-ipn.exe",
+        os.path.join(os.environ.get("LOCALAPPDATA", ""), "Tailscale", "tailscale-ipn.exe"),
+    ]
+    for ipn in ipn_candidates:
+        if os.path.isfile(ipn):
+            try:
+                DETACHED = 0x00000008 | 0x00000200
+                subprocess.Popen([ipn], creationflags=DETACHED)
+            except Exception:
+                pass
+            break
+
+
 def start_tailscale(background=True):
     """
     Attempt to start the Tailscale daemon and bring the device up.
@@ -140,13 +159,16 @@ def start_tailscale(background=True):
 
     Behaviour:
     - If tailscale is not installed → logs clean notice and operates in local Wi-Fi mode.
-    - If already connected → prints the Tailscale IP and returns True.
+    - If already connected → ensures tray icon is running, prints the Tailscale IP and returns True.
     - If not running → starts Tailscale daemon in background and opens auth URL if required.
     """
     ts = _find_tailscale_bin()
     if ts is None:
         print("[Desktop] Tailscale not detected locally. Operating in local Wi-Fi / LAN mode.")
         return False
+
+    # Ensure Windows system tray icon is visible
+    _ensure_tailscale_tray()
 
     # Check current status first
     try:

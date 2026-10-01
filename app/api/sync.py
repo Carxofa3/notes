@@ -9,10 +9,10 @@ ns = Namespace('sync', description='Tailscale P2P Sync and CRDT Coordination API
 peer_input_model = ns.model('PeerInput', {
     'device_name': fields.String(required=False, description='Peer device name'),
     'name': fields.String(required=False, description='Alternative device name key'),
-    'magic_dns': fields.String(required=True, description='Peer MagicDNS address'),
+    'magic_dns': fields.String(required=False, description='Peer MagicDNS address'),
     'ip': fields.String(required=False, description='Tailscale IP'),
     'port': fields.Integer(required=False, description='Port'),
-    'fingerprint': fields.String(required=True, description='Ed25519 cert fingerprint')
+    'fingerprint': fields.String(required=False, description='Ed25519 cert fingerprint')
 })
 
 crdt_delta_model = ns.model('CrdtDeltaInput', {

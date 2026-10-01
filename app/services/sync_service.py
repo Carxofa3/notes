@@ -310,13 +310,16 @@ class TailscaleSyncService:
             "fingerprint": fingerprint,
             "hardware": hardware_service.get_hardware_specs(),
             "pairing_payload": {
-                "v": 1,
-                "magic_dns": magic_dns,
-                "ip": tailscale_ip,
-                "lan_ip": lan_ip,
-                "port": self.DEFAULT_PORT,
-                "http_port": self.FLASK_PORT,
+                "type": "NOTES_PAIR",
+                "v": 2,
                 "name": self.get_node_name(),
+                "lan_url": f"http://{lan_ip}:{self.FLASK_PORT}",
+                "tailscale_url": f"http://{tailscale_ip}:{self.FLASK_PORT}" if tailscale_ip else None,
+                "lan_ip": lan_ip,
+                "tailscale_ip": tailscale_ip,
+                "http_port": self.FLASK_PORT,
+                "sync_port": self.DEFAULT_PORT,
+                "magic_dns": magic_dns,
                 "fingerprint": fingerprint,
                 "ts": int(time.time())
             }
@@ -324,10 +327,10 @@ class TailscaleSyncService:
 
     def register_peer(self, peer_data: Dict[str, Any]) -> TailscalePeer:
         device_name = peer_data.get("device_name") or peer_data.get("name") or "Remote Peer"
-        magic_dns = peer_data.get("magic_dns")
+        magic_dns = peer_data.get("magic_dns") or f"{device_name.lower().replace(' ', '-')}.tailnet.ts.net"
         tailscale_ip = peer_data.get("ip") or peer_data.get("tailscale_ip")
         port = peer_data.get("port", self.DEFAULT_PORT)
-        fingerprint = peer_data.get("fingerprint")
+        fingerprint = peer_data.get("fingerprint") or f"peer-{int(time.time())}"
 
         existing = TailscalePeer.query.filter(
             (TailscalePeer.magic_dns == magic_dns) | (TailscalePeer.fingerprint == fingerprint)
@@ -335,7 +338,8 @@ class TailscaleSyncService:
 
         if existing:
             existing.device_name = device_name
-            existing.tailscale_ip = tailscale_ip
+            if tailscale_ip:
+                existing.tailscale_ip = tailscale_ip
             existing.port = port
             existing.is_active = True
             db.session.commit()
@@ -380,8 +384,29 @@ class TailscaleSyncService:
         db.session.commit()
         return True
 
-    def _detect_tailscale_ip(self) -> str:
-        """Find the 100.x.y.z Tailscale CGNAT address if active on the host"""
+    def _detect_tailscale_ip(self) -> Optional[str]:
+        """Find the real 100.x.y.z Tailscale IP using the CLI or network interfaces."""
+        import shutil, subprocess
+        # 1. Try tailscale CLI (direct & accurate)
+        ts_candidates = [
+            shutil.which("tailscale"),
+            r"C:\Program Files\Tailscale\tailscale.exe",
+            r"C:\Program Files (x86)\Tailscale\tailscale.exe",
+            os.path.join(os.environ.get("LOCALAPPDATA", ""), "Tailscale", "tailscale.exe"),
+        ]
+        for ts_bin in ts_candidates:
+            if ts_bin and os.path.isfile(ts_bin):
+                try:
+                    res = subprocess.check_output(
+                        [ts_bin, "ip", "-4"],
+                        timeout=1.5, text=True, stderr=subprocess.DEVNULL
+                    ).strip()
+                    if res and res.startswith("100."):
+                        return res
+                except Exception:
+                    pass
+
+        # 2. Try socket.getaddrinfo fallback
         try:
             addrs = socket.getaddrinfo(socket.gethostname(), None)
             for addr in addrs:
@@ -390,7 +415,8 @@ class TailscaleSyncService:
                     return ip
         except Exception:
             pass
-        return "100.64.0.1"
+
+        return None
 
     def _get_or_create_fingerprint(self) -> str:
         seed = f"{socket.gethostname()}-tailscale-notes-cert"
