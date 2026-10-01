@@ -103,8 +103,14 @@ jobs:
       - name: Build Windows Setup Wizard with NSIS
         run: |
           choco install nsis -y
-          makensis scripts/installer.nsi
-          ls -lh dist/
+          $nsisPath = "C:\Program Files (x86)\NSIS\makensis.exe"
+          if (-not (Test-Path $nsisPath)) {
+            $cmd = Get-Command makensis -ErrorAction SilentlyContinue
+            if ($cmd) { $nsisPath = $cmd.Source }
+          }
+          Write-Host "Using NSIS executable: $nsisPath"
+          & "$nsisPath" "-DROOT_DIR=." "scripts\installer.nsi"
+          Get-ChildItem -Path dist\
 
       - name: Upload Windows EXE artifact
         uses: actions/upload-artifact@v4

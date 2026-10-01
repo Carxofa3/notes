@@ -4,17 +4,21 @@
 !include "MUI2.nsh"
 !include "FileFunc.nsh"
 
+!ifndef ROOT_DIR
+  !define ROOT_DIR "."
+!endif
+
 ; General Settings
 Name "Notes Workstation"
-OutFile "..\dist\Notes-Workstation-Setup.exe"
+OutFile "${ROOT_DIR}\dist\Notes-Workstation-Setup.exe"
 InstallDir "$LOCALAPPDATA\Programs\NotesWorkstation"
 InstallDirRegKey HKCU "Software\NotesWorkstation" "Install_Dir"
 RequestExecutionLevel user
 
 ; Interface Settings
 !define MUI_ABORTWARNING
-!define MUI_ICON "..\src-tauri\icons\icon.ico"
-!define MUI_UNICON "..\src-tauri\icons\icon.ico"
+!define MUI_ICON "${ROOT_DIR}\src-tauri\icons\icon.ico"
+!define MUI_UNICON "${ROOT_DIR}\src-tauri\icons\icon.ico"
 !define MUI_HEADERIMAGE
 !define MUI_WELCOMEFINISHPAGE_BITMAP_NOSTRETCH
 
@@ -36,8 +40,8 @@ Section "Notes Workstation (required)" SecCore
   SetOutPath "$INSTDIR"
   
   ; Write the standalone server + GUI executable
-  File "..\dist\Notes-Workstation-Windows.exe"
-  File "..\src-tauri\icons\icon.ico"
+  File "${ROOT_DIR}\dist\Notes-Workstation-Windows.exe"
+  File "${ROOT_DIR}\src-tauri\icons\icon.ico"
 
   ; Store installation folder in registry
   WriteRegStr HKCU "Software\NotesWorkstation" "Install_Dir" "$INSTDIR"
