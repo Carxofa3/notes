@@ -13,10 +13,13 @@ import ctypes
 import subprocess
 from typing import Dict, Any, Tuple, Optional
 
+CREATE_NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
+
 
 class HardwareService:
     def __init__(self):
         self._cached_specs: Optional[Dict[str, Any]] = None
+        self._cached_gpu: Optional[Tuple[str, Optional[float], Optional[float]]] = None
         self._last_checked = 0
         self._cache_ttl = 30  # Cache for 30 seconds to minimize queries
 
@@ -107,7 +110,11 @@ class HardwareService:
 
         elif sys.platform == "darwin":
             try:
-                out = subprocess.check_output(["sysctl", "-n", "hw.memsize"], timeout=1.0, text=True).strip()
+                out = subprocess.check_output(
+                    ["sysctl", "-n", "hw.memsize"],
+                    timeout=1.0, text=True,
+                    creationflags=CREATE_NO_WINDOW
+                ).strip()
                 total_gb = round(int(out) / (1024**3), 1)
                 return total_gb, round(total_gb * 0.5, 1)
             except Exception:
@@ -116,7 +123,10 @@ class HardwareService:
         return 0.0, 0.0
 
     def _get_gpu(self) -> Tuple[str, Optional[float], Optional[float]]:
-        """Query GPU model and VRAM in GB using nvidia-smi or system CIM/WMI."""
+        """Query GPU model and VRAM in GB using nvidia-smi, winreg, or lspci."""
+        if self._cached_gpu is not None:
+            return self._cached_gpu
+
         # 1. First try nvidia-smi (works on Windows & Linux with NVIDIA GPUs)
         if shutil.which("nvidia-smi"):
             try:
@@ -124,7 +134,8 @@ class HardwareService:
                     ["nvidia-smi", "--query-gpu=name,memory.total,memory.free", "--format=csv,noheader,nounits"],
                     timeout=1.5,
                     text=True,
-                    stderr=subprocess.DEVNULL
+                    stderr=subprocess.DEVNULL,
+                    creationflags=CREATE_NO_WINDOW
                 ).strip()
                 if out:
                     line = out.splitlines()[0]
@@ -132,37 +143,52 @@ class HardwareService:
                     name = parts[0]
                     total_gb = round(float(parts[1]) / 1024.0, 1)
                     free_gb = round(float(parts[2]) / 1024.0, 1) if len(parts) > 2 else None
-                    return name, total_gb, free_gb
+                    self._cached_gpu = (name, total_gb, free_gb)
+                    return self._cached_gpu
             except Exception:
                 pass
 
-        # 2. Windows fallback: CIM Win32_VideoController
+        # 2. Windows: Fast zero-process winreg query
         if sys.platform == "win32":
             try:
-                out = subprocess.check_output(
-                    ["powershell", "-NoProfile", "-Command", "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name"],
-                    timeout=2.0,
-                    text=True,
-                    stderr=subprocess.DEVNULL
-                ).strip()
-                if out:
-                    first_line = out.splitlines()[0].strip()
-                    return first_line, None, None
+                import winreg
+                path = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
+                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path) as base_key:
+                    for i in range(50):
+                        try:
+                            sub_name = winreg.EnumKey(base_key, i)
+                            with winreg.OpenKey(base_key, sub_name) as sub_key:
+                                try:
+                                    desc, _ = winreg.QueryValueEx(sub_key, "DriverDesc")
+                                    if desc and desc not in ("Basic Render Driver", "Microsoft Basic Display Adapter"):
+                                        self._cached_gpu = (desc, None, None)
+                                        return self._cached_gpu
+                                except FileNotFoundError:
+                                    pass
+                        except OSError:
+                            break
             except Exception:
                 pass
 
         # 3. Linux fallback: lspci
         if sys.platform.startswith("linux") and shutil.which("lspci"):
             try:
-                out = subprocess.check_output(["lspci"], timeout=1.5, text=True, stderr=subprocess.DEVNULL)
+                out = subprocess.check_output(
+                    ["lspci"],
+                    timeout=1.5, text=True,
+                    stderr=subprocess.DEVNULL,
+                    creationflags=CREATE_NO_WINDOW
+                )
                 for line in out.splitlines():
                     if "VGA" in line or "3D" in line:
                         clean = line.split(":")[-1].strip()
-                        return clean, None, None
+                        self._cached_gpu = (clean, None, None)
+                        return self._cached_gpu
             except Exception:
                 pass
 
-        return "Integrated / CPU", None, None
+        self._cached_gpu = ("Integrated / CPU", None, None)
+        return self._cached_gpu
 
 
 hardware_service = HardwareService()

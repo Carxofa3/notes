@@ -16,6 +16,8 @@ import subprocess
 from typing import Dict, Any, List, Optional, Tuple
 from app.version import __version__, GITHUB_REPO, REPO_OWNER, REPO_NAME
 
+CREATE_NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
+
 
 def parse_semver(version_str: str) -> Tuple[int, ...]:
     """Parse string like 'v2.1.3' or '2.0.0-beta' into integer tuple for accurate comparison."""
@@ -200,7 +202,8 @@ class UpdaterService:
                     ["gh", "release", "view", "--json", "tagName,name,body,publishedAt,assets"],
                     timeout=5.0,
                     text=True,
-                    stderr=subprocess.DEVNULL
+                    stderr=subprocess.DEVNULL,
+                    creationflags=CREATE_NO_WINDOW
                 ).strip()
                 if out:
                     return json.loads(out)
@@ -213,7 +216,8 @@ class UpdaterService:
                     ["gh", "release", "list", "--json", "tagName,name,isLatest,publishedAt", "-L", "1"],
                     timeout=4.0,
                     text=True,
-                    stderr=subprocess.DEVNULL
+                    stderr=subprocess.DEVNULL,
+                    creationflags=CREATE_NO_WINDOW
                 ).strip()
                 if out:
                     data = json.loads(out)
@@ -223,7 +227,8 @@ class UpdaterService:
                             ["gh", "release", "view", tag, "--json", "tagName,name,body,publishedAt,assets"],
                             timeout=5.0,
                             text=True,
-                            stderr=subprocess.DEVNULL
+                            stderr=subprocess.DEVNULL,
+                            creationflags=CREATE_NO_WINDOW
                         ).strip()
                         if view_out:
                             return json.loads(view_out)

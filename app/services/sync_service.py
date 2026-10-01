@@ -397,9 +397,11 @@ class TailscaleSyncService:
         for ts_bin in ts_candidates:
             if ts_bin and os.path.isfile(ts_bin):
                 try:
+                    create_flag = 0x08000000 if sys.platform == "win32" else 0
                     res = subprocess.check_output(
                         [ts_bin, "ip", "-4"],
-                        timeout=1.5, text=True, stderr=subprocess.DEVNULL
+                        timeout=1.5, text=True, stderr=subprocess.DEVNULL,
+                        creationflags=create_flag
                     ).strip()
                     if res and res.startswith("100."):
                         return res

@@ -8,7 +8,10 @@ with warnings.catch_warnings():
     try:
         from pypdf import PdfReader
     except ImportError:
-        from PyPDF2 import PdfReader
+        try:
+            from PyPDF2 import PdfReader
+        except ImportError:
+            PdfReader = None
 
 from typing import List, Dict, Any, Optional
 from app.database import db

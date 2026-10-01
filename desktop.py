@@ -384,6 +384,12 @@ def main():
         except Exception as e:
             print(f"[Desktop] Error starting pywebview: {e}. Falling back to default browser.")
             webbrowser.open(target_url)
+            print("[Desktop] Server running in background with default browser. Press Ctrl+C to exit.")
+            try:
+                while True:
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                pass
     else:
         print(f"[Desktop] pywebview not detected or browser flag enabled. Opening {target_url} in browser...")
         webbrowser.open(target_url)

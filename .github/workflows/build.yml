@@ -281,19 +281,20 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG_NAME="v2.1.9"
-          TITLE="Notes Workstation v2.1.9 — Pure Window Mode & In-App Dialogs"
+          TAG_NAME="v2.1.10"
+          TITLE="Notes Workstation v2.1.10 — Zero Console Popups & Silent Background Subprocesses"
           cat << 'EOF' > release_notes.md
-          ### Notes Workstation v2.1.9
+          ### Notes Workstation v2.1.10
 
           #### What's new in this release
 
-          - **Pure Windowed Desktop (No Terminal / Console Window)**: The Windows application now launches exclusively as a sleek, native GUI window (`--windowed`). No command prompt, black terminal, or debug logs will appear. Tailscale mesh background services are silently managed in the background without creating sub-consoles.
-          - **In-App Accessible Dialog System**: Replaced browser `prompt()`, `confirm()`, and `alert()` calls with custom in-app accessible modals (`ModalDialog`). Fixes unresponsive `+ Course`, `+ Folder`, and `Make a new note` buttons in WebView2 / Windows desktop.
-          - **Workstation Hub & Settings Tab Switching**: Fixed reactive effect loop in SettingsModal so switching between Appearance, Network & Mesh, AI & Compute, Storage, and About & Updates operates instantly without resetting.
-          - **P2P Mesh Modal Crash Fix**: Restored missing `fetchAppVersion` import in `TailscalePairingModal`, fixing the green status light / P2P Mesh launcher button.
-          - **Seamless Upgrader**: The Windows setup installer now automatically checks for and uninstalls previous installations silently before installing updates.
-          - **Default Browser Link Routing**: External URLs (GitHub releases, documentation, issue tracker) open directly in the user's default browser.
+          - **Complete Subprocess Window Suppression (Zero Flashing Terminal Popups)**: Fixed the issue where short-lived black terminal windows repeatedly popped up and closed every few seconds during background polling. Replaced PowerShell GPU inspection with instant, native Windows Registry (`winreg`) reads (0 spawned processes), cached hardware specs persistently, and added `CREATE_NO_WINDOW = 0x08000000` to all subprocess calls (Tailscale, updater, GPU, pip).
+          - **Resilient Background Server Keep-Alive**: Hardened fallback mechanism in `desktop.py` to ensure the local server remains running persistently if pywebview or external browser handles are invoked.
+          - **Pure Windowed Desktop (No Terminal / Console Window)**: The Windows application launches exclusively as a sleek, native GUI window (`--windowed`, `console=False`). Tailscale mesh and synchronization background processes run completely silently.
+          - **In-App Accessible Dialog System**: Full in-app dialogs for `+ Course`, `+ Folder`, and `Make a new note` buttons.
+          - **Workstation Hub & Settings Tab Switching**: Instant switching across Appearance, Network & Mesh, AI & Compute, Storage, and About tabs.
+          - **P2P Mesh Modal Crash Fix**: Restored missing `fetchAppVersion` import in `TailscalePairingModal`.
+          - **Seamless Upgrader**: Installer automatically detects and silently upgrades previous installations.
 
           #### Downloads
 

@@ -107,7 +107,11 @@ class GLiNERService:
             if not self.is_installed():
                 print("[GLiNER Hub] gliner package missing. Auto-installing dependencies via pip...")
                 import subprocess
-                subprocess.check_call([sys.executable, "-m", "pip", "install", "gliner", "torch", "transformers"])
+                create_flag = 0x08000000 if sys.platform == "win32" else 0
+                subprocess.check_call(
+                    [sys.executable, "-m", "pip", "install", "gliner", "torch", "transformers"],
+                    creationflags=create_flag
+                )
                 self._download_progress = 40
 
             from gliner import GLiNER
