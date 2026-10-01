@@ -297,6 +297,8 @@ jobs:
           #### What's new in this release
 
           - Paired devices retain both LAN and Tailscale addresses and switch routes automatically when one becomes unreachable.
+          - Remote API and WebSocket access now require the credential embedded in the pairing QR code.
+          - Android 9+ release APKs use a protected signing key and a signed rotation lineage for existing installs.
           - Tailscale is used only when already configured; the app no longer starts its client or opens authentication prompts on startup.
           - Includes the existing silent desktop launcher, multi-platform installers, and Android package.
 

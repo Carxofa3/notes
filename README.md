@@ -35,8 +35,14 @@
    - Supports native `/completion` with custom prompt framing as well as `/v1/chat/completions`.
 
 6. **Zero-Cloud P2P Collaboration & Sync**
-   - Real-time **Yjs CRDT** binary delta synchronization over WebSocket listener (`ws://0.0.0.0:58855`).
-   - Dynamic QR Code pairing for zero-configuration LAN sync between desktop and Android tablet/phone.
+   - Real-time **Yjs CRDT** binary delta synchronization over an authenticated WebSocket listener.
+   - QR pairing grants a persistent device credential; remote API and sync requests require that credential.
+   - Paired devices keep both LAN and Tailscale routes and switch automatically when one becomes unreachable.
+   - Android releases require Android 9 or newer.
+
+### Pairing security
+
+The QR code contains the workstation's pairing credential. Only scan it on devices you trust. The credential is stored in the workstation user's private data folder and in the paired phone's app storage. Tailscale encrypts traffic across the tailnet. LAN connections use HTTP, so pair only while both devices are on a trusted private network.
 
 ---
 
