@@ -6,62 +6,14 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
-    inputs:
-      rotate_android_signing:
-        description: 'Create the one-time Android signing lineage artifact'
-        type: boolean
-        required: false
-        default: false
 
 permissions:
   contents: read
 
 jobs:
-  prepare-android-signing-lineage:
-    name: Prepare Android Signing Key Rotation
-    if: ${{ inputs.rotate_android_signing }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Prepare Android signing tools
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-      - name: Create the signed key lineage
-        env:
-          ANDROID_SIGNING_KEYSTORE_BASE64: ${{ secrets.ANDROID_SIGNING_KEYSTORE_BASE64 }}
-          ANDROID_SIGNING_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_SIGNING_KEYSTORE_PASSWORD }}
-          ANDROID_SIGNING_KEY_ALIAS: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
-          ANDROID_SIGNING_KEY_PASSWORD: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
-          BUILD_TOOLS_DIR=$(ls -d "${ANDROID_HOME}"/build-tools/* | sort -V | tail -n 1)
-          git show HEAD^:release.keystore > "$RUNNER_TEMP/android-legacy.keystore"
-          printf '%s' "$ANDROID_SIGNING_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/android-current.keystore"
-          trap 'rm -f "$RUNNER_TEMP/android-legacy.keystore" "$RUNNER_TEMP/android-current.keystore"' EXIT
-          "$BUILD_TOOLS_DIR/apksigner" rotate \
-            --out android-signing-lineage.bin \
-            --old-signer --ks "$RUNNER_TEMP/android-legacy.keystore" \
-              --ks-pass pass:notes1234 --ks-key-alias notesworkstation --key-pass pass:notes1234 \
-            --new-signer --ks "$RUNNER_TEMP/android-current.keystore" \
-              --ks-pass env:ANDROID_SIGNING_KEYSTORE_PASSWORD \
-              --ks-key-alias "$ANDROID_SIGNING_KEY_ALIAS" \
-              --key-pass env:ANDROID_SIGNING_KEY_PASSWORD
-          test -s android-signing-lineage.bin
-      - uses: actions/upload-artifact@v4
-        with:
-          name: android-signing-lineage
-          path: android-signing-lineage.bin
-          retention-days: 1
-
   # ── Backend Tests ──────────────────────────────────────────────────────────
   test-backend:
     name: Backend Tests (Python)
-    if: ${{ !inputs.rotate_android_signing }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -80,7 +32,6 @@ jobs:
   # ── Frontend Build ─────────────────────────────────────────────────────────
   build-frontend:
     name: Frontend Build (Svelte 5)
-    if: ${{ !inputs.rotate_android_signing }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -104,7 +55,6 @@ jobs:
   # ── Windows PyInstaller EXE ────────────────────────────────────────────────
   build-pyinstaller-windows:
     name: Windows Desktop (PyInstaller EXE)
-    if: ${{ !inputs.rotate_android_signing }}
     needs: [test-backend, build-frontend]
     runs-on: windows-latest
     steps:
@@ -175,7 +125,6 @@ jobs:
   # ── Tauri Desktop (Linux) ──────────────────────────────────────────────────
   build-desktop:
     name: Tauri Desktop (${{ matrix.platform }})
-    if: ${{ !inputs.rotate_android_signing }}
     needs: [test-backend, build-frontend]
     strategy:
       fail-fast: false
@@ -218,7 +167,6 @@ jobs:
   # ── Android APK ───────────────────────────────────────────────────────────
   build-android:
     name: Android Build (APK)
-    if: ${{ !inputs.rotate_android_signing }}
     needs: [test-backend, build-frontend]
     runs-on: ubuntu-latest
     steps:
@@ -301,7 +249,7 @@ jobs:
   # ── Publish GitHub Release ─────────────────────────────────────────────────
   publish-release:
     name: Publish GitHub Release
-    if: ${{ (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')) && !inputs.rotate_android_signing && !cancelled() }}
+    if: ${{ (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')) && !cancelled() }}
     needs: [build-pyinstaller-windows, build-desktop, build-android]
     permissions:
       contents: write
