@@ -3,6 +3,25 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+def get_database_uri():
+    if os.environ.get('DATABASE_URL'):
+        return os.environ.get('DATABASE_URL')
+    
+    # 1. If notes.db exists in current working directory, use it
+    local_db = os.path.join(os.getcwd(), 'notes.db')
+    if os.path.exists(local_db):
+        return f"sqlite:///{local_db.replace('\\', '/')}"
+    
+    # 2. Otherwise, store in persistent user home directory (~/.notes_workstation/notes.db)
+    # This prevents SQLite database loss when running standalone portable EXEs
+    data_dir = os.path.join(os.path.expanduser('~'), '.notes_workstation')
+    try:
+        os.makedirs(data_dir, exist_ok=True)
+        user_db = os.path.join(data_dir, 'notes.db').replace('\\', '/')
+        return f"sqlite:///{user_db}"
+    except Exception:
+        return 'sqlite:///notes.db'
+
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'you-will-never-guess'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
@@ -18,11 +37,11 @@ class Config:
 
 class DevelopmentConfig(Config):
     DEBUG = True
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///notes.db'
+    SQLALCHEMY_DATABASE_URI = get_database_uri()
 
 class ProductionConfig(Config):
     DEBUG = False
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///notes.db'
+    SQLALCHEMY_DATABASE_URI = get_database_uri()
 
 class TestConfig(Config):
     TESTING = True

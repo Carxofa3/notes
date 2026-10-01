@@ -15,6 +15,14 @@ def create_app(config_name='default'):
     db.init_app(app)
     migrate.init_app(app, db)
 
+    # Automatically create tables if not present (crucial for standalone .exe and fresh installs)
+    with app.app_context():
+        try:
+            from .models import models as _models  # noqa: F401 - ensures all models are loaded
+            db.create_all()
+        except Exception as e:
+            print(f"[Database] Warning during auto-table creation: {e}")
+
     # Register API blueprints
     from .api import api_bp
     from .api.decide import decide_bp
