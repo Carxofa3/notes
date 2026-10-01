@@ -108,8 +108,9 @@ jobs:
             $cmd = Get-Command makensis -ErrorAction SilentlyContinue
             if ($cmd) { $nsisPath = $cmd.Source }
           }
-          Write-Host "Using NSIS executable: $nsisPath"
-          & "$nsisPath" "-DROOT_DIR=." "scripts\installer.nsi"
+          $root = (Get-Location).Path
+          Write-Host "Using NSIS executable: $nsisPath at root: $root"
+          & "$nsisPath" "-DROOT_DIR=$root" "$root\scripts\installer.nsi"
           Get-ChildItem -Path dist\
 
       - name: Upload Windows EXE artifact

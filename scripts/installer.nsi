@@ -5,7 +5,7 @@
 !include "FileFunc.nsh"
 
 !ifndef ROOT_DIR
-  !define ROOT_DIR "."
+  !define ROOT_DIR ".."
 !endif
 
 ; General Settings
@@ -17,8 +17,8 @@ RequestExecutionLevel user
 
 ; Interface Settings
 !define MUI_ABORTWARNING
-!define MUI_ICON "${ROOT_DIR}\src-tauri\icons\icon.ico"
-!define MUI_UNICON "${ROOT_DIR}\src-tauri\icons\icon.ico"
+!define MUI_ICON "icon.ico"
+!define MUI_UNICON "icon.ico"
 !define MUI_HEADERIMAGE
 !define MUI_WELCOMEFINISHPAGE_BITMAP_NOSTRETCH
 
@@ -41,7 +41,7 @@ Section "Notes Workstation (required)" SecCore
   
   ; Write the standalone server + GUI executable
   File "${ROOT_DIR}\dist\Notes-Workstation-Windows.exe"
-  File "${ROOT_DIR}\src-tauri\icons\icon.ico"
+  File "icon.ico"
 
   ; Store installation folder in registry
   WriteRegStr HKCU "Software\NotesWorkstation" "Install_Dir" "$INSTDIR"
