@@ -43,27 +43,25 @@
   let storageStats = $state({ lessons: 0, units: 0, notes: 0 });
 
   // About & Auto-Updater State
-  let currentAppVer = $state(`v${typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.1.7'}`);
+  let currentAppVer = $state(`v${typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.1.9'}`);
   let updateInfo = $state(null);
   let isCheckingUpdate = $state(false);
   let updateError = $state('');
+  let showClearConfirm = $state(false);
+
+  let prevOpen = $state(false);
 
   $effect(() => {
-    if (isOpen) {
-      if (initialTab) {
-        activeTab = initialTab;
+    if (isOpen && !prevOpen) {
+      activeTab = initialTab || 'appearance';
+      serverInput = getServerUrl();
+      loadStorageStats();
+      if (activeTab === 'compute') {
+        loadComputeData();
       }
-      loadSettingsData();
     }
+    prevOpen = isOpen;
   });
-
-  async function loadSettingsData() {
-    serverInput = getServerUrl();
-    loadStorageStats();
-    if (activeTab === 'compute') {
-      await loadComputeData();
-    }
-  }
 
   function loadStorageStats() {
     try {
@@ -136,14 +134,11 @@
     }
   }
 
-  function handleClearStorage() {
-    if (confirm('Warning: This will clear locally cached notes on this device. Cloud / PC notes are preserved. Proceed?')) {
-      localStorage.removeItem('notes_offline_lessons');
-      localStorage.removeItem('notes_offline_units');
-      localStorage.removeItem('notes_offline_notes');
-      alert('Local storage cleared. The app will now reload.');
-      window.location.reload();
-    }
+  function executeClearStorage() {
+    localStorage.removeItem('notes_offline_lessons');
+    localStorage.removeItem('notes_offline_units');
+    localStorage.removeItem('notes_offline_notes');
+    window.location.reload();
   }
 
   function handleExportNotes() {
@@ -573,19 +568,29 @@
                 </button>
               </div>
 
-              <div class="p-3.5 rounded-xl bg-rose-950/20 border border-rose-500/20 flex items-center justify-between gap-3">
-                <div class="flex flex-col gap-0.5">
-                  <span class="font-semibold text-xs text-rose-300">Clear Local Cache</span>
-                  <span class="text-[11px] text-rose-300/70">Wipe locally cached notes on this device. (Does not affect server SQLite DB).</span>
+              {#if showClearConfirm}
+                <div class="p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/50 flex flex-col sm:flex-row items-center justify-between gap-3 animate-in fade-in">
+                  <span class="text-xs text-rose-200">Are you sure? This will wipe offline cached notes on this device.</span>
+                  <div class="flex gap-2">
+                    <button class="px-3 py-1.5 text-xs bg-[var(--card)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg hover:bg-[var(--bg-tertiary)] border border-[var(--border)] cursor-pointer" onclick={() => showClearConfirm = false}>Cancel</button>
+                    <button class="px-3 py-1.5 text-xs bg-rose-600 text-white rounded-lg hover:bg-rose-500 font-semibold cursor-pointer" onclick={executeClearStorage}>Yes, Clear & Reload</button>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-900/40 hover:bg-rose-800/50 border border-rose-500/40 text-rose-200 transition-all shrink-0 cursor-pointer"
-                  onclick={handleClearStorage}
-                >
-                  Clear Cache
-                </button>
-              </div>
+              {:else}
+                <div class="p-3.5 rounded-xl bg-rose-950/20 border border-rose-500/20 flex items-center justify-between gap-3">
+                  <div class="flex flex-col gap-0.5">
+                    <span class="font-semibold text-xs text-rose-300">Clear Local Cache</span>
+                    <span class="text-[11px] text-rose-300/70">Wipe locally cached notes on this device. (Does not affect server SQLite DB).</span>
+                  </div>
+                  <button
+                    type="button"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-900/40 hover:bg-rose-800/50 border border-rose-500/40 text-rose-200 transition-all shrink-0 cursor-pointer"
+                    onclick={() => showClearConfirm = true}
+                  >
+                    Clear Cache
+                  </button>
+                </div>
+              {/if}
             </div>
           </div>
         {/if}

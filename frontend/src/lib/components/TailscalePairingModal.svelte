@@ -16,11 +16,13 @@
     triggerRemoteGliner,
     selectActiveLlm,
     fetchGlinerStatus,
-    triggerGlinerDownload
+    triggerGlinerDownload,
+    fetchAppVersion
   } from '../api.js';
 
   let { isOpen = $bindable(false) } = $props();
 
+  let currentAppVer = $state('v2.1.9');
   let pairInfo = $state(null);
   let peers = $state([]);
   let inputToken = $state('');

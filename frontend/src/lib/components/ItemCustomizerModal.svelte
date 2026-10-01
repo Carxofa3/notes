@@ -37,11 +37,17 @@
     isOpen = false;
   }
 
-  function handleDelete() {
-    if (confirm(`Are you sure you want to delete this ${item?.type || 'item'}? This cannot be undone.`)) {
-      onDelete(item);
-      isOpen = false;
+  let confirmDelete = $state(false);
+
+  $effect(() => {
+    if (!isOpen) {
+      confirmDelete = false;
     }
+  });
+
+  function handleDelete() {
+    onDelete(item);
+    isOpen = false;
   }
 </script>
 
@@ -133,27 +139,48 @@
 
       <!-- Action buttons -->
       <div class="flex items-center justify-between pt-2 border-t border-[var(--border)]">
-        <button
-          class="px-3 py-1.5 rounded-xl text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-950/20 transition-colors"
-          onclick={handleDelete}
-        >
-          🗑️ Delete
-        </button>
+        {#if confirmDelete}
+          <div class="flex items-center justify-between w-full gap-2">
+            <span class="text-xs text-rose-300 font-medium">Delete permanently?</span>
+            <div class="flex gap-2">
+              <button
+                type="button"
+                class="px-2.5 py-1 text-xs rounded-lg bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--text-secondary)]"
+                onclick={() => confirmDelete = false}
+              >Cancel</button>
+              <button
+                type="button"
+                class="px-3 py-1 text-xs rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold shadow-xs"
+                onclick={handleDelete}
+              >Yes, Delete</button>
+            </div>
+          </div>
+        {:else}
+          <button
+            type="button"
+            class="px-3 py-1.5 rounded-xl text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-950/20 transition-colors cursor-pointer"
+            onclick={() => confirmDelete = true}
+          >
+            🗑️ Delete
+          </button>
 
-        <div class="flex gap-2">
-          <button
-            class="px-3 py-1.5 rounded-xl text-xs bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)]"
-            onclick={() => isOpen = false}
-          >
-            Cancel
-          </button>
-          <button
-            class="px-4 py-1.5 rounded-xl text-xs font-semibold bg-[var(--accent)] text-white hover:opacity-90"
-            onclick={handleSave}
-          >
-            Save
-          </button>
-        </div>
+          <div class="flex gap-2">
+            <button
+              type="button"
+              class="px-3 py-1.5 rounded-xl text-xs bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] cursor-pointer"
+              onclick={() => isOpen = false}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="px-4 py-1.5 rounded-xl text-xs font-semibold bg-[var(--accent)] text-white hover:opacity-90 cursor-pointer"
+              onclick={handleSave}
+            >
+              Save
+            </button>
+          </div>
+        {/if}
       </div>
     </div>
   </div>

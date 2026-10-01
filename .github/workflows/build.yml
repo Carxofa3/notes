@@ -85,6 +85,7 @@ jobs:
         run: |
           pyinstaller `
             --onefile `
+            --windowed `
             --name "Notes-Workstation-Windows" `
             --add-data "frontend/dist;frontend/dist" `
             --add-data "app;app" `
@@ -280,23 +281,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG_NAME="v2.1.8"
-          TITLE="Notes Workstation v2.1.8 — Integrated Windows Setup Wizard & Modern Settings Hub"
+          TAG_NAME="v2.1.9"
+          TITLE="Notes Workstation v2.1.9 — Pure Window Mode & In-App Dialogs"
           cat << 'EOF' > release_notes.md
-          ### Notes Workstation v2.1.8
+          ### Notes Workstation v2.1.9
 
           #### What's new in this release
 
-          - **Official Windows Setup Wizard (`Notes-Workstation-Setup.exe`)**: The Windows installer now bundles the complete Python backend server, GLiNER neural extractor, llama.cpp proxy, and Tailscale mesh! Installs Start Menu and Desktop shortcuts and automatically launches the server on startup.
-          - **Standalone Portable EXE (`Notes-Workstation-Windows.exe`)**: Updated standalone single-file binary with all v2.1.8 features.
-          - **Consolidated Workstation Hub & Settings**: A unified 5-tab settings modal replacing fragmented dialogs:
-            - 🎨 **Appearance & Themes**: 5 color palettes (Midnight, Paper White, Solarized, Cyberpunk, OLED Black).
-            - 🌐 **Network & Mesh**: Server IP, live ping test with latency badge, presets, and a shortcut to open QR Pairing.
-            - 🧠 **AI & Compute**: GLiNER neural extractor status and download, llama.cpp proxy port and health test, and host hardware specs.
-            - 💾 **Storage**: Live count of cached courses/units/notes, JSON backup export, and cache wipe.
-            - ℹ️ **About & Updates**: **Official home for "Check for Updates"** with version badge, changelog preview, and matched one-tap installer/APK download button.
-          - **Peer-to-Peer Pairing Cleanup**: Removed the misplaced updater banner from the QR pairing modal so it focuses 100% on device connections and mesh nodes.
-          - **Desktop Base Detection Fix**: Fixed `isStandaloneMobile()` so the desktop app connects to `127.0.0.1:58850` without treating Windows as an offline mobile device.
+          - **Pure Windowed Desktop (No Terminal / Console Window)**: The Windows application now launches exclusively as a sleek, native GUI window (`--windowed`). No command prompt, black terminal, or debug logs will appear. Tailscale mesh background services are silently managed in the background without creating sub-consoles.
+          - **In-App Accessible Dialog System**: Replaced browser `prompt()`, `confirm()`, and `alert()` calls with custom in-app accessible modals (`ModalDialog`). Fixes unresponsive `+ Course`, `+ Folder`, and `Make a new note` buttons in WebView2 / Windows desktop.
+          - **Workstation Hub & Settings Tab Switching**: Fixed reactive effect loop in SettingsModal so switching between Appearance, Network & Mesh, AI & Compute, Storage, and About & Updates operates instantly without resetting.
+          - **P2P Mesh Modal Crash Fix**: Restored missing `fetchAppVersion` import in `TailscalePairingModal`, fixing the green status light / P2P Mesh launcher button.
+          - **Seamless Upgrader**: The Windows setup installer now automatically checks for and uninstalls previous installations silently before installing updates.
+          - **Default Browser Link Routing**: External URLs (GitHub releases, documentation, issue tracker) open directly in the user's default browser.
 
           #### Downloads
 

@@ -30,6 +30,7 @@
   import FloatingAccessoryBar from './lib/components/FloatingAccessoryBar.svelte';
   import SettingsModal from './lib/components/SettingsModal.svelte';
   import ItemCustomizerModal from './lib/components/ItemCustomizerModal.svelte';
+  import ModalDialog from './lib/components/ModalDialog.svelte';
   import { analyzeAndCategorize } from './lib/organizer.js';
 
   // State
@@ -48,6 +49,60 @@
   // Item Customizer Modal
   let showCustomizer = $state(false);
   let customizingItem = $state(null);
+
+  // In-App Accessible Dialog System (replaces window.prompt & window.confirm)
+  let dialogState = $state({
+    isOpen: false,
+    type: 'prompt',
+    title: '',
+    message: '',
+    icon: '📝',
+    defaultValue: '',
+    placeholder: '',
+    confirmText: 'Confirm',
+    cancelText: 'Cancel',
+    danger: false,
+    onConfirm: () => {},
+    onCancel: () => {}
+  });
+
+  function showPromptDialog({ title, message = '', icon = '📝', defaultValue = '', placeholder = '', confirmText = 'Create' }) {
+    return new Promise((resolve) => {
+      dialogState = {
+        isOpen: true,
+        type: 'prompt',
+        title,
+        message,
+        icon,
+        defaultValue,
+        placeholder,
+        confirmText,
+        cancelText: 'Cancel',
+        danger: false,
+        onConfirm: (val) => resolve(val),
+        onCancel: () => resolve(null)
+      };
+    });
+  }
+
+  function showConfirmDialog({ title, message = '', icon = '⚠️', confirmText = 'Confirm', danger = false }) {
+    return new Promise((resolve) => {
+      dialogState = {
+        isOpen: true,
+        type: 'confirm',
+        title,
+        message,
+        icon,
+        defaultValue: '',
+        placeholder: '',
+        confirmText,
+        cancelText: 'Cancel',
+        danger,
+        onConfirm: () => resolve(true),
+        onCancel: () => resolve(false)
+      };
+    });
+  }
 
   // Auto-organizer toast notification
   let organizerToast = $state('');
@@ -153,7 +208,12 @@
   }
 
   async function handleCreateLesson() {
-    const name = prompt('New Course / Subject Name:');
+    const name = await showPromptDialog({
+      title: 'New Course / Subject',
+      message: 'Enter a name for your course (e.g. CS101, Linear Algebra, Biology)',
+      icon: '📚',
+      placeholder: 'Course name...'
+    });
     if (name && name.trim()) {
       const l = await createLesson(name.trim(), '📚', '#3b82f6');
       if (l) {
@@ -165,7 +225,14 @@
   }
 
   async function handleDeleteLesson(lesson) {
-    if (confirm(`Delete course "${lesson.name}" and all its folders and notes? This cannot be undone.`)) {
+    const confirmed = await showConfirmDialog({
+      title: 'Delete Course',
+      message: `Are you sure you want to delete course "${lesson.name}" and all its folders and notes? This cannot be undone.`,
+      icon: '🗑️',
+      confirmText: 'Delete Course',
+      danger: true
+    });
+    if (confirmed) {
       await deleteLesson(lesson.id);
       lessons = lessons.filter(l => l.id !== lesson.id);
       if (activeLesson?.id === lesson.id) {
@@ -183,7 +250,12 @@
       else await handleCreateLesson();
     }
     if (!activeLesson) return;
-    const name = prompt(`New Folder Name in ${activeLesson.name}:`);
+    const name = await showPromptDialog({
+      title: `New Folder in ${activeLesson.name}`,
+      message: 'Enter a folder or unit name (e.g. Week 1, Homework, Exam Prep)',
+      icon: '📁',
+      placeholder: 'Folder name...'
+    });
     if (name && name.trim()) {
       const u = await createUnit(activeLesson.id, name.trim(), '📁', '#10b981');
       if (u) {
@@ -216,7 +288,12 @@
       if (lessons.length > 0) {
         activeLesson = lessons[0];
       } else {
-        const name = prompt('Enter a Course Name for your note:');
+        const name = await showPromptDialog({
+          title: 'Create Your First Course',
+          message: 'To create notes, you need at least one course / subject.',
+          icon: '📚',
+          placeholder: 'Course name (e.g. Computer Science)...'
+        });
         if (!name || !name.trim()) return;
         const l = await createLesson(name.trim(), '📚', '#3b82f6');
         if (!l) return;
@@ -229,7 +306,12 @@
       if (existingUnits.length > 0) {
         activeUnit = existingUnits[0];
       } else {
-        const uName = prompt(`Enter Folder Name in ${activeLesson.name}:`);
+        const uName = await showPromptDialog({
+          title: `Create Folder in ${activeLesson.name}`,
+          message: 'Enter a folder name to organize your notes.',
+          icon: '📁',
+          placeholder: 'Folder name (e.g. Chapter 1)...'
+        });
         if (!uName || !uName.trim()) return;
         const u = await createUnit(activeLesson.id, uName.trim(), '📁', '#10b981');
         if (!u) return;
@@ -242,7 +324,14 @@
 
   async function handleDeleteActiveNote() {
     if (!activeNote) return;
-    if (confirm(`Delete note "${activeNote.title}"?`)) {
+    const confirmed = await showConfirmDialog({
+      title: 'Delete Note',
+      message: `Are you sure you want to delete note "${activeNote.title}"?`,
+      icon: '🗑️',
+      confirmText: 'Delete Note',
+      danger: true
+    });
+    if (confirmed) {
       await deleteNote(activeNote.id);
       activeNote = null;
       await refreshTree();
@@ -313,7 +402,13 @@
       showToast(`🪄 Moved note into folder "${res.unitName}" with ${res.suggestedIcon}!`);
       await refreshTree();
     } else if (res.type === 'new_folder') {
-      if (confirm(`🪄 Auto-Organizer suggests creating new folder "${res.unitName}" (${res.suggestedIcon}) for this note. Proceed?`)) {
+      const confirmed = await showConfirmDialog({
+        title: 'Auto-Organize Note',
+        message: `Auto-Organizer suggests creating new folder "${res.unitName}" (${res.suggestedIcon}) for this note. Proceed?`,
+        icon: '🪄',
+        confirmText: 'Create & Organize'
+      });
+      if (confirmed) {
         const newUnit = await createUnit(activeLesson?.id || 'default', res.unitName, res.suggestedIcon, res.suggestedColor);
         if (newUnit) {
           await updateNote(activeNote.id, {
@@ -830,6 +925,21 @@
     {units}
     onSave={handleSaveCustomizer}
     onDelete={handleDeleteCustomizer}
+  />
+
+  <ModalDialog
+    bind:isOpen={dialogState.isOpen}
+    type={dialogState.type}
+    title={dialogState.title}
+    message={dialogState.message}
+    icon={dialogState.icon}
+    defaultValue={dialogState.defaultValue}
+    placeholder={dialogState.placeholder}
+    confirmText={dialogState.confirmText}
+    cancelText={dialogState.cancelText}
+    danger={dialogState.danger}
+    onConfirm={dialogState.onConfirm}
+    onCancel={dialogState.onCancel}
   />
 
   {#if organizerToast}

@@ -3,6 +3,21 @@
 
 !include "MUI2.nsh"
 !include "FileFunc.nsh"
+!include "LogicLib.nsh"
+
+Function .onInit
+  ; Clean up legacy lowercase Tauri installation if present
+  ReadRegStr $0 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\notes-workstation" "UninstallString"
+  ${If} $0 != ""
+    ExecWait '$0 /S'
+  ${EndIf}
+
+  ; Clean up previous Notes Workstation installation if present
+  ReadRegStr $0 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\NotesWorkstation" "UninstallString"
+  ${If} $0 != ""
+    ExecWait '$0 /S _?=$INSTDIR'
+  ${EndIf}
+FunctionEnd
 
 !ifndef ROOT_DIR
   !define ROOT_DIR ".."
@@ -54,7 +69,7 @@ Section "Notes Workstation (required)" SecCore
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\NotesWorkstation" "DisplayIcon" "$INSTDIR\icon.ico"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\NotesWorkstation" "UninstallString" '"$INSTDIR\Uninstall.exe"'
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\NotesWorkstation" "Publisher" "Notes Team"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\NotesWorkstation" "DisplayVersion" "2.1.8"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\NotesWorkstation" "DisplayVersion" "2.1.9"
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\NotesWorkstation" "NoModify" 1
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\NotesWorkstation" "NoRepair" 1
 

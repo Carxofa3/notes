@@ -16,15 +16,31 @@ import subprocess
 import urllib.request
 import webbrowser
 
-# Ensure Windows stdout/stderr handles UTF-8 without charmap crashes
+CREATE_NO_WINDOW = 0x08000000 if sys.platform == 'win32' else 0
+
+# Ensure Windows stdout/stderr handles UTF-8 without charmap crashes or windowed mode NoneType crashes
 if sys.platform == 'win32':
-    try:
-        if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
+    if sys.stdout is None:
+        try:
+            sys.stdout = open(os.devnull, 'w', encoding='utf-8')
+        except Exception:
+            pass
+    elif hasattr(sys.stdout, 'reconfigure'):
+        try:
             sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-        if sys.stderr and hasattr(sys.stderr, 'reconfigure'):
+        except Exception:
+            pass
+
+    if sys.stderr is None:
+        try:
+            sys.stderr = open(os.devnull, 'w', encoding='utf-8')
+        except Exception:
+            pass
+    elif hasattr(sys.stderr, 'reconfigure'):
+        try:
             sys.stderr.reconfigure(encoding='utf-8', errors='replace')
-    except Exception:
-        pass
+        except Exception:
+            pass
 
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
@@ -115,7 +131,8 @@ def start_sync_server(root_dir, port=58855):
             cwd=root_dir,
             env=env,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
+            stderr=subprocess.DEVNULL,
+            creationflags=CREATE_NO_WINDOW
         )
         return proc
     except Exception as e:
@@ -147,7 +164,8 @@ def get_tailscale_ip():
     try:
         result = subprocess.run(
             [ts, 'ip', '-4'],
-            capture_output=True, text=True, timeout=5
+            capture_output=True, text=True, timeout=5,
+            creationflags=CREATE_NO_WINDOW
         )
         ip = result.stdout.strip()
         if ip and ip.startswith('100.'):
@@ -170,7 +188,12 @@ def _ensure_tailscale_tray():
         if os.path.isfile(ipn):
             try:
                 DETACHED = 0x00000008 | 0x00000200
-                subprocess.Popen([ipn], creationflags=DETACHED)
+                subprocess.Popen(
+                    [ipn],
+                    creationflags=DETACHED | CREATE_NO_WINDOW,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
             except Exception:
                 pass
             break
@@ -198,7 +221,8 @@ def start_tailscale(background=True):
     try:
         status = subprocess.run(
             [ts, 'status', '--json'],
-            capture_output=True, text=True, timeout=3
+            capture_output=True, text=True, timeout=3,
+            creationflags=CREATE_NO_WINDOW
         )
         import json
         data = json.loads(status.stdout or '{}')
@@ -218,7 +242,8 @@ def start_tailscale(background=True):
                 [ts, 'up', '--reset', '--accept-routes'],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
-                text=True
+                text=True,
+                creationflags=CREATE_NO_WINDOW
             )
             for line in proc.stdout:
                 line = line.strip()
@@ -340,6 +365,10 @@ def main():
             has_webview = False
 
     if has_webview:
+        try:
+            webview.settings['OPEN_EXTERNAL_LINKS_IN_BROWSER'] = True
+        except Exception:
+            pass
         print(f"[Desktop] Launching native Edge/WebKit window for {target_url}...")
         try:
             window = webview.create_window(
