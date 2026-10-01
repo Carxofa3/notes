@@ -133,79 +133,69 @@ def get_tailscale_ip():
     return None
 
 
-def start_tailscale():
+def start_tailscale(background=True):
     """
     Attempt to start the Tailscale daemon and bring the device up.
+    Runs asynchronously by default so desktop startup is instantaneous.
 
     Behaviour:
-    - If tailscale is not installed → prints a helpful download URL and returns False.
+    - If tailscale is not installed → logs clean notice and operates in local Wi-Fi mode.
     - If already connected → prints the Tailscale IP and returns True.
-    - If not authenticated → opens the auth URL in the browser for the user to approve.
-    - Returns True on success, False on failure.
+    - If not running → starts Tailscale daemon in background and opens auth URL if required.
     """
     ts = _find_tailscale_bin()
     if ts is None:
-        print("[Desktop] ⚠  Tailscale not found.")
-        print("[Desktop]    Download Tailscale from: https://tailscale.com/download")
-        print("[Desktop]    After installing, re-launch the app with --tailscale.")
+        print("[Desktop] Tailscale not detected locally. Operating in local Wi-Fi / LAN mode.")
         return False
-
-    print(f"[Desktop] Tailscale binary found at: {ts}")
 
     # Check current status first
     try:
         status = subprocess.run(
             [ts, 'status', '--json'],
-            capture_output=True, text=True, timeout=10
+            capture_output=True, text=True, timeout=3
         )
         import json
         data = json.loads(status.stdout or '{}')
         backend_state = data.get('BackendState', '')
         if backend_state == 'Running':
             ts_ip = get_tailscale_ip() or 'unknown'
-            print(f"[Desktop] ✓ Tailscale already running. This device IP: {ts_ip}")
+            print(f"[Desktop] ✓ Tailscale connected. Cross-network IP: {ts_ip}")
             return True
     except Exception:
         pass
 
-    # Not running — try `tailscale up`
-    print("[Desktop] Starting Tailscale (this may open a browser for authentication)...")
-    try:
-        proc = subprocess.Popen(
-            [ts, 'up', '--accept-routes'],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True
-        )
-        # Print output in a background thread so we don't block
-        def _pipe_output():
+    # If background mode requested, launch thread
+    def _run_tailscale_up():
+        print("[Desktop] Bringing up Tailscale for cross-network mesh...")
+        try:
+            proc = subprocess.Popen(
+                [ts, 'up', '--accept-routes'],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True
+            )
             for line in proc.stdout:
                 line = line.strip()
                 if line:
-                    # Detect auth URL and open it
                     if line.startswith('https://'):
-                        print(f"[Desktop] 🔐 Tailscale auth URL: {line}")
+                        print(f"[Desktop] 🔐 Tailscale auth required: {line}")
                         webbrowser.open(line)
                     else:
                         print(f"[Desktop]    {line}")
+            proc.wait(timeout=120)
+            if proc.returncode == 0:
+                ts_ip = get_tailscale_ip() or 'unknown'
+                print(f"[Desktop] ✓ Tailscale connected. Cross-network IP: {ts_ip}")
+        except Exception as e:
+            print(f"[Desktop] Tailscale background notice: {e}")
 
-        t = threading.Thread(target=_pipe_output, daemon=True)
+    if background:
+        t = threading.Thread(target=_run_tailscale_up, daemon=True)
         t.start()
-        proc.wait(timeout=120)  # wait up to 2 min for auth
-
-        if proc.returncode == 0:
-            ts_ip = get_tailscale_ip() or 'unknown'
-            print(f"[Desktop] ✓ Tailscale connected. This device IP: {ts_ip}")
-            return True
-        else:
-            print(f"[Desktop] ✗ Tailscale exited with code {proc.returncode}.")
-            return False
-    except subprocess.TimeoutExpired:
-        print("[Desktop] Tailscale auth timed out. Please complete authentication in your browser.")
-        return False
-    except Exception as e:
-        print(f"[Desktop] Exception while starting Tailscale: {e}")
-        return False
+        return True
+    else:
+        _run_tailscale_up()
+        return True
 
 
 def print_connection_info(flask_port):
@@ -230,9 +220,9 @@ def print_connection_info(flask_port):
     for ip in lan_ips:
         print(f"  LAN:        http://{ip}:{flask_port}")
     if ts_ip:
-        print(f"  Tailscale:  http://{ts_ip}:{flask_port}  (works across networks!)")
+        print(f"  Tailscale:  http://{ts_ip}:{flask_port}  (cross-network active!)")
     else:
-        print("  Tailscale:  not connected (run with --tailscale to enable)")
+        print("  Tailscale:  auto-connecting in background (pass --no-tailscale to skip)")
     print("─" * 55 + "\n")
 
 
@@ -245,16 +235,18 @@ def main():
     parser.add_argument('--dev', action='store_true', help="Point to Vite dev server at http://localhost:5173")
     parser.add_argument('--fullscreen', action='store_true', help="Launch in fullscreen mode")
     parser.add_argument('--browser', action='store_true', help="Force open in default web browser instead of webview")
-    parser.add_argument('--tailscale', action='store_true',
-                        help="Auto-start Tailscale on launch for cross-network access")
+    parser.add_argument('--tailscale', dest='tailscale', action='store_true', default=True,
+                        help="Auto-detect & enable Tailscale on launch for cross-network access (default: enabled)")
+    parser.add_argument('--no-tailscale', dest='tailscale', action='store_false',
+                        help="Disable automatic Tailscale detection & startup")
     args = parser.parse_args()
 
     root_dir = os.path.abspath(os.path.dirname(__file__))
     os.chdir(root_dir)
 
-    # 1. Optionally start Tailscale before anything else
+    # 1. Tailscale is enabled by default (runs non-blocking in background)
     if args.tailscale:
-        start_tailscale()
+        start_tailscale(background=True)
 
     # 2. Start Yjs P2P sync server in background
     sync_port = args.sync_port or find_free_port(58855)
