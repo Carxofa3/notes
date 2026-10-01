@@ -22,33 +22,60 @@ import webbrowser
 def find_free_port(start_port=5000, max_attempts=50):
     """Find an available TCP port starting from start_port."""
     for port in range(start_port, start_port + max_attempts):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            try:
+        # 1. Probe if another process is actively listening
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+                probe.settimeout(0.2)
+                if probe.connect_ex(('127.0.0.1', port)) == 0:
+                    continue
+        except Exception:
+            pass
+
+        # 2. Test binding to both 0.0.0.0 and 127.0.0.1
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(('0.0.0.0', port))
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.bind(('127.0.0.1', port))
-                return port
-            except OSError:
-                continue
+            return port
+        except OSError:
+            continue
     return start_port
 
 
-def wait_for_server(url, timeout=15):
-    """Wait until the HTTP server is responsive."""
-    start_time = time.time()
-    while time.time() - start_time < timeout:
-        try:
-            with urllib.request.urlopen(url, timeout=1) as resp:
-                if resp.status in (200, 302, 404):
-                    return True
-        except Exception:
-            time.sleep(0.2)
-    return False
-
-
-def start_flask(app, host, port):
-    """Run Flask application in a dedicated thread."""
+def create_flask_server(app, host='0.0.0.0', preferred_port=5000, max_attempts=50):
+    """
+    Directly bind Werkzeug WSGI server to an available port.
+    If preferred_port (e.g. 5000) is in use, automatically tries subsequent ports
+    (5001, 5002, ...) until an open port is secured.
+    """
     from werkzeug.serving import make_server
-    server = make_server(host, port, app, threaded=True)
-    server.serve_forever()
+
+    ports_to_try = []
+    if preferred_port:
+        ports_to_try.append(preferred_port)
+    ports_to_try.extend(range(5000, 5000 + max_attempts))
+    
+    seen = set()
+    ordered_ports = [p for p in ports_to_try if not (p in seen or seen.add(p))]
+
+    for port in ordered_ports:
+        # Check if already listening
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+                probe.settimeout(0.15)
+                if probe.connect_ex(('127.0.0.1', port)) == 0:
+                    continue
+        except Exception:
+            pass
+
+        try:
+            server = make_server(host, port, app, threaded=True)
+            return server, port
+        except (OSError, socket.error):
+            continue
+
+    raise RuntimeError(f"Could not bind Flask backend to any port in range 5000-{5000+max_attempts}")
 
 
 def start_sync_server(root_dir, port=58855):
@@ -229,28 +256,32 @@ def main():
     if args.tailscale:
         start_tailscale()
 
-    # 2. Determine Flask port
-    flask_port = args.port or find_free_port(5000)
-    host = '0.0.0.0'
-    local_check_url = f"http://127.0.0.1:{flask_port}"
-
-    # 3. Start Yjs P2P sync server in background
-    sync_proc = start_sync_server(root_dir, args.sync_port)
+    # 2. Start Yjs P2P sync server in background
+    sync_port = args.sync_port or find_free_port(58855)
+    sync_proc = start_sync_server(root_dir, sync_port)
     if sync_proc:
-        print(f"[Desktop] P2P Yjs WebSocket sync server active on ws://0.0.0.0:{args.sync_port}")
+        print(f"[Desktop] P2P Yjs WebSocket sync server active on ws://0.0.0.0:{sync_port}")
 
-    # 4. Import and start Flask app in a daemon thread
+    # 3. Import and start Flask app on a guaranteed free port
     from app import create_app
     flask_app = create_app(os.getenv('FLASK_CONFIG') or 'default')
 
+    server, flask_port = create_flask_server(flask_app, host='0.0.0.0', preferred_port=args.port or 5000)
+    local_check_url = f"http://127.0.0.1:{flask_port}"
+
+    # Inform discovery beacon of actual HTTP port
+    try:
+        from app.services.sync_service import sync_service
+        sync_service.FLASK_PORT = flask_port
+    except Exception:
+        pass
+
     flask_thread = threading.Thread(
-        target=start_flask,
-        args=(flask_app, host, flask_port),
+        target=server.serve_forever,
         daemon=True
     )
     flask_thread.start()
 
-    # 5. Wait for Flask to become ready
     print(f"[Desktop] Initializing backend on all interfaces port {flask_port}...")
     if not wait_for_server(local_check_url, timeout=10):
         print("[Desktop] Warning: Backend server did not respond quickly, continuing anyway.")
