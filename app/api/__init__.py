@@ -12,6 +12,8 @@ from .sync import ns as sync_ns
 from .academic import ns as academic_ns
 from .decide import ns as decide_ns, decide_bp
 from .gliner import ns as gliner_ns
+from .nodes import ns as nodes_ns
+from .updater import ns as updater_ns
 
 api_bp = Blueprint('api', __name__)
 
@@ -26,7 +28,7 @@ authorizations = {
 api = Api(
     api_bp,
     title='University Notes App API',
-    version='2.0',
+    version='2.1',
     description='A comprehensive API for university lecture notes, local course RAG, Tailscale P2P sync, and autonomous fact-checking',
     authorizations=authorizations,
     security='apikey'
@@ -43,4 +45,6 @@ api.add_namespace(sync_ns, path='/sync')
 api.add_namespace(academic_ns, path='/academic')
 api.add_namespace(decide_ns, path='/decide')
 api.add_namespace(gliner_ns, path='/gliner')
+api.add_namespace(nodes_ns, path='/nodes')
+api.add_namespace(updater_ns, path='/updater')
 

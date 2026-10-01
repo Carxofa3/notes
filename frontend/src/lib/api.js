@@ -331,3 +331,83 @@ export async function registerPeer(peerData) {
   });
   return res && res.ok ? await res.json() : null;
 }
+
+// --- Cluster & Nodes Management ---
+export async function fetchClusterOverview() {
+  const base = getBase();
+  const res = await safeFetch(`${base}/api/nodes/cluster`);
+  return res && res.ok ? await res.json() : null;
+}
+
+export async function updateSelfConfig(data) {
+  const base = getBase();
+  const res = await safeFetch(`${base}/api/nodes/self/config`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return res && res.ok ? await res.json() : null;
+}
+
+export async function checkLocalLlamaCppHealth() {
+  const base = getBase();
+  const res = await safeFetch(`${base}/api/nodes/self/llamacpp-health`);
+  return res && res.ok ? await res.json() : null;
+}
+
+export async function renamePeerNode(peerId, alias) {
+  const base = getBase();
+  const res = await safeFetch(`${base}/api/nodes/peers/${encodeURIComponent(peerId)}/rename`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ alias })
+  });
+  return res && res.ok ? await res.json() : null;
+}
+
+export async function triggerRemoteGliner(peerId, peerUrl) {
+  const base = getBase();
+  const res = await safeFetch(`${base}/api/nodes/peers/${encodeURIComponent(peerId)}/trigger-gliner`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ peer_url: peerUrl })
+  });
+  return res && res.ok ? await res.json() : null;
+}
+
+export async function selectActiveLlm(endpoint) {
+  const base = getBase();
+  const res = await safeFetch(`${base}/api/nodes/select-llm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ endpoint })
+  });
+  return res && res.ok ? await res.json() : null;
+}
+
+// --- GLiNER Model Hub ---
+export async function fetchGlinerStatus() {
+  const base = getBase();
+  const res = await safeFetch(`${base}/api/gliner/status`);
+  return res && res.ok ? await res.json() : null;
+}
+
+export async function triggerGlinerDownload() {
+  const base = getBase();
+  const res = await safeFetch(`${base}/api/gliner/download`, { method: 'POST' });
+  return res && res.ok ? await res.json() : null;
+}
+
+// --- Auto-Updater ---
+export async function checkAppUpdates(platform = '') {
+  const base = getBase();
+  const query = platform ? `?platform=${encodeURIComponent(platform)}` : '';
+  const res = await safeFetch(`${base}/api/updater/check${query}`, {}, 5000);
+  return res && res.ok ? await res.json() : null;
+}
+
+export async function fetchAppVersion() {
+  const base = getBase();
+  const res = await safeFetch(`${base}/api/updater/version`);
+  return res && res.ok ? await res.json() : null;
+}

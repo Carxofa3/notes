@@ -44,14 +44,26 @@ Student Notes:
         return self._call_llm(prompt)
 
     def _call_llm(self, prompt: str) -> str:
-        # Check if remote Tailscale node or llama.cpp instance is configured in settings
-        llm_node = current_app.config.get('LLAMA_CPP_NODE') or current_app.config.get('TAILSCALE_LLM_NODE') # e.g. "http://desktop-gpu.tailnet-xyz.ts.net:8080"
+        # Check cluster active LLM provider or local llama.cpp configuration
+        llm_node = None
+        try:
+            from app.services.sync_service import sync_service
+            cluster_provider = sync_service.get_active_llm_provider()
+            if cluster_provider:
+                llm_node = cluster_provider
+            elif sync_service.is_llamacpp_enabled():
+                llm_node = f"http://127.0.0.1:{sync_service.get_llamacpp_local_port()}"
+        except Exception:
+            pass
+
+        if not llm_node:
+            llm_node = current_app.config.get('LLAMA_CPP_NODE') or current_app.config.get('TAILSCALE_LLM_NODE') # e.g. "http://desktop-gpu.tailnet-xyz.ts.net:8080"
         api_base = llm_node or current_app.config.get('LLM_API_BASE') or "http://localhost:8080"
         api_key = current_app.config.get('LLM_API_KEY') or "llamacpp-no-key-needed"
         model = current_app.config.get('LLM_MODEL') or "default"
 
-        # 1. First-class llama.cpp server support (standard llama-server port :8080)
-        if ":8080" in api_base or "llama" in api_base.lower():
+        # 1. First-class llama.cpp server support (standard llama-server port :8080 or proxy)
+        if ":8080" in api_base or "llama" in api_base.lower() or "/proxy/llm" in api_base:
             # Try native llama.cpp /completion endpoint first for maximum speed & zero overhead
             try:
                 resp = requests.post(
