@@ -16,9 +16,7 @@
     triggerRemoteGliner,
     selectActiveLlm,
     fetchGlinerStatus,
-    triggerGlinerDownload,
-    checkAppUpdates,
-    fetchAppVersion
+    triggerGlinerDownload
   } from '../api.js';
 
   let { isOpen = $bindable(false) } = $props();
@@ -50,11 +48,6 @@
   let editingPeerAlias = $state('');
   let clusterMessage = $state('');
 
-  // Auto-Updater State
-  let updateInfo = $state(null);
-  let isCheckingUpdate = $state(false);
-  let updateError = $state('');
-  let currentAppVer = $state(`v${typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '?.?.?'}`);
   let clusterPollTimer = null;
   let glinerPollTimer = null;
 
@@ -326,24 +319,7 @@
     }
   }
 
-  async function handleCheckForUpdates() {
-    isCheckingUpdate = true;
-    updateError = '';
-    try {
-      const detectedPlatform = /android/i.test(navigator.userAgent) ? 'android' : (/linux/i.test(navigator.userAgent) ? 'linux' : 'windows');
-      const res = await checkAppUpdates(detectedPlatform);
-      if (res) {
-        updateInfo = res;
-      } else {
-        updateError = 'Could not reach GitHub. Check your internet connection.';
-      }
-    } catch (e) {
-      console.warn('Update check failed:', e);
-      updateError = `Update check failed: ${e.message || 'Unknown error'}`;
-    } finally {
-      isCheckingUpdate = false;
-    }
-  }
+
 
   async function handleCopyPayload() {
     let payload = '';
@@ -595,69 +571,7 @@
       {#if activeTab === 'cluster'}
         <!-- ── TAB 2: NODES & CLUSTER MANAGEMENT ── -->
         <div class="flex flex-col gap-4">
-          <!-- Auto-Updater Banner -->
-          <div class="p-3.5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] flex flex-col gap-2">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-2">
-                <span class="text-xs font-bold text-[var(--text-primary)]">Application Updates</span>
-                <span class="text-[11px] font-mono text-[var(--text-secondary)]">Current: {currentAppVer}</span>
-              </div>
-              <button
-                type="button"
-                class="px-2.5 py-1 rounded-lg text-xs font-medium bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--text-primary)] transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                disabled={isCheckingUpdate}
-                onclick={handleCheckForUpdates}
-              >
-                <span>{isCheckingUpdate ? '⏳ Checking...' : '🔄 Check for Updates'}</span>
-              </button>
-            </div>
 
-            {#if updateInfo}
-              {#if updateInfo.update_available}
-                <div class="p-3 rounded-lg bg-emerald-950/40 border border-emerald-500/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                  <div class="flex flex-col gap-0.5">
-                    <span class="font-bold text-emerald-300 flex items-center gap-1.5">
-                      🚀 New Version Available: {updateInfo.latest_version}
-                    </span>
-                    <span class="text-[11px] text-emerald-200/90">{updateInfo.release_title}</span>
-                    {#if updateInfo.recommended_asset}
-                      <span class="text-[10px] text-emerald-300/80 font-mono mt-0.5">
-                        Matched for your device: {updateInfo.recommended_asset.name} ({updateInfo.recommended_asset.size_mb} MB)
-                      </span>
-                    {/if}
-                  </div>
-                  {#if updateInfo.recommended_asset}
-                    <a
-                      href={updateInfo.recommended_asset.download_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs text-center shrink-0 shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      ⬇️ Download {updateInfo.recommended_asset.name.endsWith('.apk') ? 'APK' : 'Update'}
-                    </a>
-                  {:else}
-                    <a
-                      href={updateInfo.html_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs text-center shrink-0 cursor-pointer"
-                    >
-                      View GitHub Release
-                    </a>
-                  {/if}
-                </div>
-              {:else}
-                <div class="p-2 rounded-lg bg-[var(--card)] border border-[var(--border)] text-[11px] text-[var(--text-secondary)] flex items-center gap-1.5">
-                  <span>✅ Notes Workstation is completely up to date ({currentAppVer}).</span>
-                </div>
-              {/if}
-            {/if}
-            {#if updateError && !updateInfo}
-              <div class="p-2 rounded-lg bg-amber-950/30 border border-amber-500/40 text-[11px] text-amber-300 flex items-center gap-1.5">
-                <span>⚠️ {updateError}</span>
-              </div>
-            {/if}
-          </div>
 
           {#if clusterMessage}
             <div class="p-2.5 rounded-lg border text-xs font-mono {clusterMessage.includes('Failed') || clusterMessage.includes('Error') ? 'bg-red-950/30 border-red-500/40 text-red-400' : 'bg-emerald-950/30 border-emerald-500/40 text-emerald-300'}">

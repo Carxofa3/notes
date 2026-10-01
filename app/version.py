@@ -3,7 +3,7 @@
 Notes Workstation Single Source of Truth for Application Versioning.
 """
 
-__version__ = "2.1.7"
+__version__ = "2.1.8"
 APP_NAME = "Notes Workstation"
 REPO_OWNER = "Carxofa3"
 REPO_NAME = "notes"

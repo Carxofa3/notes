@@ -65,6 +65,12 @@
   let showSlides = $state(false);
   let showPairing = $state(false);
   let showSettings = $state(false);
+  let settingsTab = $state('appearance');
+
+  function openSettings(tab = 'appearance') {
+    settingsTab = tab;
+    showSettings = true;
+  }
 
   // Responsive Drawer toggle for mobile (<768px)
   let showMobileSidebar = $state(false);
@@ -453,8 +459,8 @@
       <!-- Settings button -->
       <button
         class="p-1.5 rounded-lg text-xs font-medium bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center justify-center shadow-xs"
-        onclick={() => showSettings = true}
-        title="Settings (Server IP, Theme, Offline Storage)"
+        onclick={() => openSettings('appearance')}
+        title="Workstation Hub & Settings (Themes, Server, AI, Updates)"
       >
         <span>⚙️</span>
       </button>
@@ -814,6 +820,8 @@
 
   <SettingsModal
     bind:isOpen={showSettings}
+    initialTab={settingsTab}
+    onOpenPairing={() => showPairing = true}
   />
 
   <ItemCustomizerModal

@@ -30,9 +30,10 @@ function isStandaloneMobile() {
   if (typeof window === 'undefined') return false;
   // If user configured a custom server URL, we are not standalone
   if (getServerUrl()) return false;
-  // Detect Tauri app environment
+  // Only mobile devices running Tauri or tauri.localhost are standalone mobile
+  const isMobile = typeof navigator !== 'undefined' && /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+  if (!isMobile) return false;
   if (window.__TAURI_INTERNALS__ || window.__TAURI__) return true;
-  // Detect tauri localhost origins
   if (window.location.origin.includes('tauri.localhost') || window.location.protocol === 'tauri:') return true;
   return false;
 }
@@ -43,6 +44,10 @@ function getBase() {
   // If running in standalone Tauri mobile without configured server, bypass network fetches immediately
   if (isStandaloneMobile()) {
     return null;
+  }
+  // On desktop Tauri, default to local backend server port
+  if (typeof window !== 'undefined' && (window.__TAURI_INTERNALS__ || window.__TAURI__)) {
+    return 'http://127.0.0.1:58850';
   }
   // If running in browser or desktop electron/pywebview on same origin
   if (typeof window !== 'undefined' && window.location.origin.startsWith('http')) {
@@ -478,8 +483,8 @@ export async function checkAppUpdatesDirect(platform = '') {
       recommended = assets.find(a => /universal/i.test(a.name) && a.name.endsWith('.apk'))
         || assets.find(a => a.name.endsWith('.apk'));
     } else if (targetPlatform === 'windows') {
-      recommended = assets.find(a => /windows\.exe/i.test(a.name) && !/setup/i.test(a.name))
-        || assets.find(a => /setup\.exe/i.test(a.name) || a.name.endsWith('.msi'))
+      recommended = assets.find(a => /setup\.exe/i.test(a.name) || /installer.*\.exe/i.test(a.name))
+        || assets.find(a => /windows\.exe/i.test(a.name))
         || assets.find(a => a.name.endsWith('.exe'));
     } else if (targetPlatform === 'linux') {
       recommended = assets.find(a => a.name.endsWith('.AppImage'))

@@ -100,13 +100,21 @@ jobs:
             --collect-all "webview" `
             desktop.py
 
+      - name: Build Windows Setup Wizard with NSIS
+        run: |
+          choco install nsis -y
+          makensis scripts/installer.nsi
+          ls -lh dist/
+
       - name: Upload Windows EXE artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-exe
-          path: dist/Notes-Workstation-Windows.exe
+          path: |
+            dist/Notes-Workstation-Windows.exe
+            dist/Notes-Workstation-Setup.exe
 
-  # ── Tauri Desktop (Windows + Linux) ───────────────────────────────────────
+  # ── Tauri Desktop (Linux) ──────────────────────────────────────────────────
   build-desktop:
     name: Tauri Desktop (${{ matrix.platform }})
     needs: [test-backend, build-frontend]
@@ -114,8 +122,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'windows-latest'
-            os_name: 'windows'
           - platform: 'ubuntu-22.04'
             os_name: 'linux'
     runs-on: ${{ matrix.platform }}
@@ -267,24 +273,30 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG_NAME="v2.1.7"
-          TITLE="Notes Workstation v2.1.7 — Fix Auto-Updater on Mobile & Dynamic Version"
+          TAG_NAME="v2.1.8"
+          TITLE="Notes Workstation v2.1.8 — Integrated Windows Setup Wizard & Modern Settings Hub"
           cat << 'EOF' > release_notes.md
-          ### Notes Workstation v2.1.7
+          ### Notes Workstation v2.1.8
 
           #### What's new in this release
 
-          - **Fixed Auto-Updater on Mobile (Standalone)**: The "Check for Updates" button previously flickered and did nothing on the phone app because it tried to call a non-existent local backend. Now, when running standalone (no server), the updater calls the GitHub Releases API directly from the browser.
-          - **Dynamic Version Display**: The current app version is now baked into the frontend at build time from `app/version.py` (single source of truth), instead of being hardcoded. The UI always shows the correct version.
-          - **Update Error Feedback**: When the update check fails (e.g. no internet), a visible warning message is shown instead of silently flickering back.
-          - **Dev Proxy Port Fix**: Vite dev server proxy now targets port `58850` instead of the old `5000`.
+          - **Official Windows Setup Wizard (`Notes-Workstation-Setup.exe`)**: The Windows installer now bundles the complete Python backend server, GLiNER neural extractor, llama.cpp proxy, and Tailscale mesh! Installs Start Menu and Desktop shortcuts and automatically launches the server on startup.
+          - **Standalone Portable EXE (`Notes-Workstation-Windows.exe`)**: Updated standalone single-file binary with all v2.1.8 features.
+          - **Consolidated Workstation Hub & Settings**: A unified 5-tab settings modal replacing fragmented dialogs:
+            - 🎨 **Appearance & Themes**: 5 color palettes (Midnight, Paper White, Solarized, Cyberpunk, OLED Black).
+            - 🌐 **Network & Mesh**: Server IP, live ping test with latency badge, presets, and a shortcut to open QR Pairing.
+            - 🧠 **AI & Compute**: GLiNER neural extractor status and download, llama.cpp proxy port and health test, and host hardware specs.
+            - 💾 **Storage**: Live count of cached courses/units/notes, JSON backup export, and cache wipe.
+            - ℹ️ **About & Updates**: **Official home for "Check for Updates"** with version badge, changelog preview, and matched one-tap installer/APK download button.
+          - **Peer-to-Peer Pairing Cleanup**: Removed the misplaced updater banner from the QR pairing modal so it focuses 100% on device connections and mesh nodes.
+          - **Desktop Base Detection Fix**: Fixed `isStandaloneMobile()` so the desktop app connects to `127.0.0.1:58850` without treating Windows as an offline mobile device.
 
           #### Downloads
 
           | Platform | File |
           |---|---|
-          | Windows (standalone portable EXE) | `Notes-Workstation-Windows.exe` |
-          | Windows (MSI installer) | `*.msi` |
+          | Windows (Official Setup Installer) | `Notes-Workstation-Setup.exe` |
+          | Windows (Portable Standalone EXE) | `Notes-Workstation-Windows.exe` |
           | Linux (Deb package) | `*.deb` |
           | Linux (AppImage) | `*.AppImage` |
           | Android (Universal APK) | `Notes-Workstation-Android-Universal-*.apk` |
@@ -292,11 +304,11 @@ jobs:
           #### Usage
 
           ```powershell
-          # Windows
-          Notes-Workstation-Windows.exe
+          # Run the installer
+          Notes-Workstation-Setup.exe
 
-          # Python (dev)
-          python desktop.py
+          # Or run portable binary directly
+          Notes-Workstation-Windows.exe
           ```
           EOF
 

@@ -163,13 +163,13 @@ class UpdaterService:
                     return c
 
         elif platform == "windows":
-            # Prefer portable standalone EXE (Notes-Workstation-Windows.exe)
+            # Prefer official setup wizard installer (Notes-Workstation-Setup.exe)
             for c in candidates:
-                if "windows.exe" in c["name"].lower() and not "setup" in c["name"].lower():
+                if "setup.exe" in c["name"].lower():
                     return c
-            # Then setup installer
+            # Then portable standalone EXE (Notes-Workstation-Windows.exe)
             for c in candidates:
-                if "setup.exe" in c["name"].lower() or c["name"].endswith(".msi"):
+                if "windows.exe" in c["name"].lower():
                     return c
             # Any EXE
             for c in candidates:
