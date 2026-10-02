@@ -22,8 +22,18 @@
 
   let { isOpen = $bindable(false) } = $props();
 
-  let currentAppVer = $state('v2.1.13');
+  let currentAppVer = $state('v2.1.14');
   let pairInfo = $state(null);
+  let localWifiUrl = $derived(
+    pairInfo?.pairing_payload?.lan_url ||
+    pairInfo?.lan_url ||
+    (pairInfo?.lan_ip ? `http://${pairInfo.lan_ip}:${pairInfo.http_port || 58850}` : null)
+  );
+  let tailscaleUrl = $derived(
+    pairInfo?.pairing_payload?.tailscale_url ||
+    pairInfo?.tailscale_url ||
+    (pairInfo?.tailscale_ip ? `http://${pairInfo.tailscale_ip}:${pairInfo.http_port || 58850}` : null)
+  );
   let peers = $state([]);
   let inputToken = $state('');
   let registerMessage = $state('');
@@ -950,12 +960,12 @@
               <!-- LAN / Wi-Fi route -->
               <div class="flex items-center justify-between gap-1 text-[11px]">
                 <div class="flex items-center gap-1.5">
-                  <span class="w-2 h-2 rounded-full {pairInfo?.lan_url ? 'bg-emerald-400' : 'bg-slate-500'}"></span>
+                  <span class="w-2 h-2 rounded-full {localWifiUrl ? 'bg-emerald-400' : 'bg-slate-500'}"></span>
                   <span class="text-[var(--text-secondary)]">🏠 Local Wi-Fi:</span>
                 </div>
                 <span class="font-mono font-medium text-[var(--text-primary)] truncate">
-                  {#if pairInfo?.lan_url}
-                    {pairInfo.lan_url}
+                  {#if localWifiUrl}
+                    {localWifiUrl}
                   {:else if currentServerUrl}
                     {currentServerUrl}
                   {:else}
@@ -972,7 +982,7 @@
                 </div>
                 <span class="font-mono font-medium text-[var(--text-primary)] truncate">
                   {#if pairInfo?.tailscale_ip}
-                    {pairInfo.tailscale_url || `http://${pairInfo.tailscale_ip}:${pairInfo.http_port || 58850}`}
+                    {tailscaleUrl}
                   {:else}
                     <span class="text-[var(--text-secondary)] italic">Offline / Not detected</span>
                   {/if}
@@ -999,8 +1009,8 @@
                 </div>
                 <div class="p-3 rounded-xl bg-[var(--card)] border border-[var(--border)] text-xs flex flex-col gap-2">
                   <span class="font-semibold text-[var(--text-primary)]">Automatic connection routes</span>
-                  <span class="text-[var(--text-secondary)]">Wi-Fi: {pairInfo.lan_url || 'Not available on this network'}</span>
-                  <span class="text-[var(--text-secondary)]">Tailscale: {pairInfo.tailscale_url || 'Not detected (Wi-Fi pairing still works)'}</span>
+                  <span class="text-[var(--text-secondary)]">Wi-Fi: {localWifiUrl || 'Not available on this network'}</span>
+                  <span class="text-[var(--text-secondary)]">Tailscale: {tailscaleUrl || 'Not detected (Wi-Fi pairing still works)'}</span>
                 </div>
                 {#if registerMessage}
                   <div class="p-2.5 rounded-lg border text-[11px] text-[var(--text-secondary)]" role="status" aria-live="polite">{registerMessage}</div>
