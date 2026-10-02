@@ -234,7 +234,7 @@ jobs:
             --ks-key-alias "$ANDROID_SIGNING_KEY_ALIAS" \
             --key-pass env:ANDROID_SIGNING_KEY_PASSWORD \
             --lineage android-signing-lineage.bin --rotation-min-sdk-version 28 \
-            --v1-signing-enabled false --v2-signing-enabled true --v3-signing-enabled true \
+            --v1-signing-enabled false --v2-signing-enabled false --v3-signing-enabled true \
             --out release-apk/Notes-Workstation-Android-Universal-v${APP_VERSION}.apk aligned.apk
 
           $BUILD_TOOLS_DIR/apksigner verify -v release-apk/Notes-Workstation-Android-Universal-v${APP_VERSION}.apk
