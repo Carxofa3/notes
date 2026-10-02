@@ -351,22 +351,32 @@ export async function fetchPairInfo(targetServerUrl = null) {
   return res && res.ok ? await res.json() : null;
 }
 
-export async function fetchPeers(targetServerUrl = null) {
+export async function fetchPeers(targetServerUrl = null, accessToken = '') {
   const base = targetServerUrl ? targetServerUrl.replace(/\/+$/, '') : getBase();
   if (base === null) return [];
-  const res = await safeFetch(`${base}/api/sync/peers`);
-  return res && res.ok ? await res.json() : [];
+  const res = await safeFetch(`${base}/api/sync/peers`, {}, 4000, accessToken);
+  if (!res) throw new Error('The paired workstation is not reachable on the available networks.');
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error(detail.message || `Could not load paired devices (${res.status}).`);
+  }
+  return await res.json();
 }
 
-export async function registerPeer(peerData, targetServerUrl = null) {
+export async function registerPeer(peerData, targetServerUrl = null, accessToken = '') {
   const base = targetServerUrl ? targetServerUrl.replace(/\/+$/, '') : getBase();
-  if (!base) return null;
+  if (!base) throw new Error('No paired workstation is configured.');
   const res = await safeFetch(`${base}/api/sync/peers`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(peerData)
-  }, 4000);
-  return res && res.ok ? await res.json() : null;
+  }, 4000, accessToken);
+  if (!res) throw new Error('Could not reach the workstation to finish pairing.');
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.peer_id) {
+    throw new Error(data.message || `The workstation did not confirm pairing (${res.status}).`);
+  }
+  return data;
 }
 
 // --- Cluster & Nodes Management ---

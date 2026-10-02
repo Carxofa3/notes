@@ -8,7 +8,6 @@
     fetchPeers,
     registerPeer,
     getServerUrl,
-    setServerUrl,
     fetchClusterOverview,
     updateSelfConfig,
     checkLocalLlamaCppHealth,
@@ -19,17 +18,23 @@
     triggerGlinerDownload,
     fetchAppVersion
   } from '../api.js';
-  import { setPairedConnection, clearPairedConnection } from '../storage.js';
+  import { setPairedConnection, clearPairedConnection, getPairedConnection, getDeviceId } from '../storage.js';
 
   let { isOpen = $bindable(false) } = $props();
 
-  let currentAppVer = $state('v2.1.11');
+  let currentAppVer = $state('v2.1.13');
   let pairInfo = $state(null);
   let peers = $state([]);
   let inputToken = $state('');
   let registerMessage = $state('');
+  let peerListError = $state('');
   let qrDataUrl = $state('');
   let isGeneratingQr = $state(false);
+  let qrPayloadKey = '';
+  let isConnecting = $state(false);
+  let connectionState = $state('offline');
+  let connectionRoute = $state('');
+  let hasPairedConnection = $state(false);
   let activeTab = $state('pairing'); // 'pairing' | 'cluster'
   let copyFeedback = $state(false);
   let isScanning = $state(false);
@@ -53,35 +58,62 @@
 
   let clusterPollTimer = null;
   let glinerPollTimer = null;
+  let peerPollTimer = null;
+  let heartbeatTimer = null;
+  let hasOpenedModal = false;
 
   onDestroy(() => {
     stopScanner();
     stopClusterPolling();
+    stopPeerPolling();
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
   });
 
   $effect(() => {
     if (isOpen) {
+      if (hasOpenedModal) return;
+      hasOpenedModal = true;
       currentServerUrl = getServerUrl();
-      if (activeTab === 'pairing') {
-        updateQrCode();
-      }
+      const paired = getPairedConnection();
+      hasPairedConnection = !!paired;
+      connectionState = paired ? 'checking' : 'offline';
+      if (paired) heartbeatPairedDevice();
       loadInfo();
       loadAppVersion();
+      startPeerPolling();
       if (activeTab === 'cluster') {
         loadClusterData();
         startClusterPolling();
       }
     } else {
+      hasOpenedModal = false;
       stopClusterPolling();
+      stopPeerPolling();
       stopScanner();
     }
   });
 
-  $effect(() => {
-    if (isOpen && activeTab === 'pairing') {
-      updateQrCode();
-    }
+  onMount(() => {
+    heartbeatPairedDevice();
+    heartbeatTimer = setInterval(heartbeatPairedDevice, 30000);
+    return () => {
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
+    };
   });
+
+  function startPeerPolling() {
+    stopPeerPolling();
+    peerPollTimer = setInterval(() => {
+      if (isOpen && activeTab === 'pairing') loadPeerList();
+    }, 5000);
+  }
+
+  function stopPeerPolling() {
+    if (peerPollTimer) {
+      clearInterval(peerPollTimer);
+      peerPollTimer = null;
+    }
+  }
 
   function startClusterPolling() {
     stopClusterPolling();
@@ -100,6 +132,34 @@
     if (glinerPollTimer) {
       clearInterval(glinerPollTimer);
       glinerPollTimer = null;
+    }
+  }
+
+  function peerIdentity() {
+    return {
+      device_name: getMobileDeviceName(),
+      fingerprint: getDeviceId()
+    };
+  }
+
+  async function heartbeatPairedDevice() {
+    const paired = getPairedConnection();
+    if (!paired?.activeUrl || !paired?.accessToken) {
+      if (!paired) {
+        hasPairedConnection = false;
+        connectionState = 'offline';
+      }
+      return;
+    }
+    hasPairedConnection = true;
+    try {
+      await registerPeer(peerIdentity());
+      connectionState = 'online';
+      const active = getPairedConnection()?.activeUrl || paired.activeUrl;
+      connectionRoute = active.includes('100.') || active.includes('.ts.net') ? 'Tailscale' : 'Wi-Fi';
+      currentServerUrl = active;
+    } catch (_) {
+      connectionState = 'offline';
     }
   }
 
@@ -128,11 +188,20 @@
   }
 
   async function updateQrCode() {
+    // A client must never turn around and display the host's pairing secret.
+    if (getPairedConnection()) {
+      qrDataUrl = '';
+      qrPayloadKey = '';
+      isGeneratingQr = false;
+      return;
+    }
+
     isGeneratingQr = true;
     try {
       let payloadToEncode = '';
       if (pairInfo && pairInfo.pairing_payload) {
-        payloadToEncode = JSON.stringify(pairInfo.pairing_payload);
+        const { ts: _volatileTimestamp, ...stablePayload } = pairInfo.pairing_payload;
+        payloadToEncode = JSON.stringify(stablePayload);
       } else if (pairInfo && (pairInfo.lan_url || pairInfo.lan_ip || pairInfo.tailscale_url)) {
         const port = pairInfo.http_port || 58850;
         payloadToEncode = JSON.stringify({
@@ -147,20 +216,13 @@
           fingerprint: pairInfo.fingerprint || 'local'
         });
       } else {
-        const customUrl = getServerUrl();
-        if (customUrl) {
-          payloadToEncode = JSON.stringify({
-            type: 'NOTES_PAIR',
-            v: 2,
-            name: 'Notes Workstation',
-            lan_url: customUrl,
-            tailscale_url: null
-          });
-        } else {
-          qrDataUrl = '';
-          return;
-        }
+        qrDataUrl = '';
+        qrPayloadKey = '';
+        return;
       }
+
+      if (!payloadToEncode || payloadToEncode === qrPayloadKey && qrDataUrl) return;
+      qrPayloadKey = payloadToEncode;
 
       const url = await QRCode.toDataURL(payloadToEncode, {
         width: 240,
@@ -183,16 +245,22 @@
       const info = await fetchPairInfo();
       if (info) {
         pairInfo = info;
-        if (activeTab === 'pairing') updateQrCode();
+        if (activeTab === 'pairing') await updateQrCode();
       }
     } catch (e) {
       console.warn('Could not fetch pair info:', e);
     }
 
+    await loadPeerList();
+  }
+
+  async function loadPeerList() {
     try {
       peers = await fetchPeers();
+      peerListError = '';
     } catch (e) {
       console.warn('Could not fetch peers:', e);
+      peerListError = e.message || 'Paired devices could not be loaded.';
     }
   }
 
@@ -325,12 +393,10 @@
 
 
   async function handleCopyPayload() {
-    let payload = '';
-    if (pairInfo && pairInfo.pairing_payload) {
-      payload = JSON.stringify(pairInfo.pairing_payload, null, 2);
-    } else {
-      payload = getServerUrl() || `http://${defaultHost}`;
-    }
+    const payload = pairInfo?.pairing_payload
+      ? JSON.stringify(pairInfo.pairing_payload, null, 2)
+      : '';
+    if (!payload) return;
     try {
       await navigator.clipboard.writeText(payload);
       copyFeedback = true;
@@ -342,131 +408,111 @@
 
   function handleDisconnect() {
     clearPairedConnection();
+    hasPairedConnection = false;
     currentServerUrl = '';
+    connectionState = 'offline';
+    connectionRoute = '';
     window.dispatchEvent(new CustomEvent('notes-server-changed', { detail: '' }));
-    registerMessage = 'ℹ️ Disconnected from workstation. Operating in standalone offline mode.';
+    registerMessage = 'Disconnected. This device will keep its local notes until you pair again.';
     setTimeout(() => { if (registerMessage.includes('Disconnected')) registerMessage = ''; }, 3500);
+  }
+
+  async function finishPairing(payload, winner, accessToken) {
+    const identity = peerIdentity();
+    const registration = await registerPeer(identity, winner.url, accessToken);
+    if (registration.fingerprint && registration.fingerprint !== identity.fingerprint) {
+      throw new Error('The workstation returned a different device identity. Pairing was not saved.');
+    }
+
+    const confirmedPeers = await fetchPeers(winner.url, accessToken);
+    if (!confirmedPeers.some(peer => peer.fingerprint === identity.fingerprint)) {
+      throw new Error('The workstation did not list this device after pairing. Try scanning again.');
+    }
+
+    setPairedConnection(payload, winner.url);
+    hasPairedConnection = true;
+    currentServerUrl = winner.url;
+    connectionState = 'online';
+    connectionRoute = winner.name;
+    window.dispatchEvent(new CustomEvent('notes-server-changed', { detail: winner.url }));
+    await loadInfo();
   }
 
   async function handleConnectPayload(rawInput) {
     const text = (rawInput || '').trim();
-    if (!text) return;
-    registerMessage = '🔍 Analyzing pairing payload...';
+    if (!text || isConnecting) return;
+    isConnecting = true;
+    registerMessage = 'Checking the pairing code…';
 
-    // 1. Plain HTTP / HTTPS URL
-    if (text.startsWith('http://') || text.startsWith('https://')) {
-      const cleanUrl = text.replace(/\/+$/, '');
-      registerMessage = `Testing connection to ${cleanUrl}...`;
-      const probe = await probeServer(cleanUrl, 3000);
-      if (probe.ok) {
-        setServerUrl(cleanUrl);
-        currentServerUrl = cleanUrl;
-        window.dispatchEvent(new CustomEvent('notes-server-changed', { detail: cleanUrl }));
-        try {
-          await registerPeer({
-            device_name: getMobileDeviceName(),
-            fingerprint: `client-${Date.now()}`
-          }, cleanUrl);
-        } catch (_) {}
-        registerMessage = `🎉 Successfully connected to ${cleanUrl}!`;
-        inputToken = '';
-        await loadInfo();
-        setTimeout(() => {
-          if (isOpen && registerMessage.startsWith('🎉')) isOpen = false;
-        }, 2200);
-        return;
-      } else {
-        registerMessage = `⚠️ Could not reach server at ${cleanUrl}. Ensure host is running.`;
-        return;
-      }
-    }
-
-    // 2. JSON pairing payload
     try {
-      const payload = JSON.parse(text);
-      const hostName = payload.name || payload.device_name || 'Workstation';
-      registerMessage = `🔍 Discovered "${hostName}"! Probing connection...`;
+      let payload;
+      if (/^https?:\/\//i.test(text)) {
+        const saved = getPairedConnection();
+        if (!saved?.accessToken) {
+          throw new Error('A server address alone cannot pair securely. Scan the QR shown in Notes Workstation.');
+        }
+        payload = {
+          type: 'NOTES_PAIR',
+          v: 2,
+          name: saved.name,
+          lan_url: text.replace(/\/+$/, ''),
+          access_token: saved.accessToken
+        };
+      } else {
+        payload = JSON.parse(text);
+      }
 
-      // Extract candidate URLs in order of priority (LAN Wi-Fi first, then Tailscale mesh)
+      if (payload.type && payload.type !== 'NOTES_PAIR') {
+        throw new Error('This code is not a Notes Workstation pairing code.');
+      }
+      if (!payload.access_token) {
+        throw new Error('This pairing code has no device credential. Reopen the QR in Notes Workstation and scan it again.');
+      }
+
+      const hostName = payload.name || payload.device_name || 'Workstation';
       const port = payload.http_port || payload.port || 58850;
       const candidates = [];
-      if (payload.lan_url) candidates.push({ name: 'Home Wi-Fi', url: payload.lan_url.replace(/\/+$/, '') });
-      if (payload.tailscale_url) candidates.push({ name: 'Tailscale Mesh', url: payload.tailscale_url.replace(/\/+$/, '') });
-      if (payload.lan_ip) candidates.push({ name: 'LAN IP', url: `http://${payload.lan_ip}:${port}` });
-      if (payload.tailscale_ip || payload.ip) candidates.push({ name: 'Tailscale IP', url: `http://${payload.tailscale_ip || payload.ip}:${port}` });
-      if (payload.magic_dns) candidates.push({ name: 'MagicDNS', url: `http://${payload.magic_dns}:${port}` });
-
-      const uniqueCandidates = [];
-      const seenUrls = new Set();
-      for (const c of candidates) {
-        if (c.url && !seenUrls.has(c.url)) {
-          seenUrls.add(c.url);
-          uniqueCandidates.push(c);
-        }
-      }
-
-      if (uniqueCandidates.length === 0) {
-        registerMessage = '❌ Invalid QR payload: No network endpoints found in scanned code.';
-        return;
-      }
+      const addCandidate = (name, rawUrl) => {
+        if (!rawUrl) return;
+        try {
+          const parsed = new URL(rawUrl);
+          if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) return;
+          const url = parsed.toString().replace(/\/+$/, '');
+          if (!candidates.some(candidate => candidate.url === url)) candidates.push({ name, url });
+        } catch (_) {}
+      };
+      addCandidate('Wi-Fi', payload.lan_url);
+      addCandidate('Tailscale', payload.tailscale_url);
+      addCandidate('Wi-Fi', payload.lan_ip ? `http://${payload.lan_ip}:${port}` : null);
+      addCandidate('Tailscale', (payload.tailscale_ip || payload.ip) ? `http://${payload.tailscale_ip || payload.ip}:${port}` : null);
+      addCandidate('Tailscale', payload.magic_dns ? `http://${payload.magic_dns}:${port}` : null);
+      if (candidates.length === 0) throw new Error('This QR code has no usable network addresses.');
 
       let winner = null;
 
-      // Stage 1: Probe local Wi-Fi / LAN first with 1.2s timeout (fastest route)
-      for (const cand of uniqueCandidates) {
-        registerMessage = `Testing ${cand.name} (${cand.url})...`;
-        const probe = await probeServer(cand.url, 1200, payload.access_token || '');
+      for (const cand of candidates) {
+        registerMessage = `Finding ${hostName} over ${cand.name}…`;
+        const probe = await probeServer(cand.url, cand.name === 'Tailscale' ? 3500 : 1800, payload.access_token);
         if (probe.ok) {
+          if (payload.fingerprint && probe.data?.fingerprint && probe.data.fingerprint !== payload.fingerprint) {
+            throw new Error('The QR code belongs to a different workstation. Scan its current QR code.');
+          }
           winner = cand;
           break;
         }
       }
 
-      // Stage 2: If Wi-Fi did not reply, probe Tailscale candidates with 3s timeout
-      if (!winner) {
-        for (const cand of uniqueCandidates) {
-          if (cand.name.toLowerCase().includes('tailscale') || cand.url.includes('100.')) {
-            registerMessage = `Testing Tailscale route (${cand.url})...`;
-            const probe = await probeServer(cand.url, 3000, payload.access_token || '');
-            if (probe.ok) {
-              winner = cand;
-              break;
-            }
-          }
-        }
-      }
+      if (!winner) throw new Error(`Could not reach ${hostName}. Check that both devices are on Wi-Fi or Tailscale, then scan again.`);
 
-      if (winner) {
-        setPairedConnection(payload, winner.url);
-        currentServerUrl = winner.url;
-        window.dispatchEvent(new CustomEvent('notes-server-changed', { detail: winner.url }));
-
-        // Register our identity on the workstation host
-        try {
-          await registerPeer({
-            device_name: getMobileDeviceName(),
-            fingerprint: `client-${Date.now()}`
-          }, winner.url);
-        } catch (e) {
-          console.warn('Peer registration notice:', e);
-        }
-
-        registerMessage = `🎉 Boom, connected to "${hostName}" via ${winner.name} (${winner.url})!`;
-        inputToken = '';
-        await loadInfo();
-        setTimeout(() => {
-          if (isOpen && registerMessage.startsWith('🎉')) isOpen = false;
-        }, 2200);
-      } else {
-        // Fallback: Configure primary candidate anyway
-        const fallback = uniqueCandidates[0];
-        setPairedConnection(payload, fallback.url);
-        currentServerUrl = fallback.url;
-        window.dispatchEvent(new CustomEvent('notes-server-changed', { detail: fallback.url }));
-        registerMessage = `⚠️ Configured server to ${fallback.url}, but host did not respond immediately. Check network and firewall.`;
-      }
+      await finishPairing(payload, winner, payload.access_token);
+      registerMessage = `Paired with ${hostName}. Connected over ${winner.name}; it will switch routes automatically when networks change.`;
+      inputToken = '';
     } catch (err) {
-      registerMessage = `❌ Could not parse QR code: ${err.message}`;
+      registerMessage = err instanceof SyntaxError
+        ? 'This is not a valid Notes Workstation pairing code.'
+        : (err.message || 'Pairing could not be completed. Try scanning again.');
+    } finally {
+      isConnecting = false;
     }
   }
 
@@ -541,11 +587,11 @@
       <div class="flex items-center justify-between border-b border-[var(--border)] pb-3">
         <div>
           <div class="flex items-center gap-2">
-            <h2 class="text-base sm:text-lg font-bold text-[var(--text-primary)]">Device Mesh & Cluster Hub</h2>
-            <span class="px-2 py-0.5 rounded text-[10px] bg-emerald-950/40 text-emerald-300 border border-emerald-500/40 font-mono">P2P Cluster Ready</span>
+            <h2 class="text-base sm:text-lg font-bold text-[var(--text-primary)]">Connect devices</h2>
+            <span class="px-2 py-0.5 rounded text-[10px] bg-[var(--bg-tertiary)] text-[var(--accent)] border border-[var(--border)]">{hasPairedConnection ? 'Paired' : 'Ready to pair'}</span>
             <span class="px-2 py-0.5 rounded text-[10px] bg-[var(--bg-tertiary)] text-[var(--accent)] font-mono">{currentAppVer}</span>
           </div>
-          <p class="text-xs text-[var(--text-secondary)]">One-scan instant pairing over Wi-Fi & Tailscale, and cluster model orchestration</p>
+          <p class="text-xs text-[var(--text-secondary)]">Scan once. Notes switches between Wi-Fi and Tailscale automatically when either route is available.</p>
         </div>
         <button 
           class="text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-xl p-1 cursor-pointer"
@@ -558,16 +604,16 @@
         <button
           type="button"
           class="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all {activeTab === 'pairing' ? 'bg-[var(--accent)] text-white shadow-xs' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'} cursor-pointer"
-          onclick={() => { activeTab = 'pairing'; stopClusterPolling(); updateQrCode(); }}
+          onclick={() => { activeTab = 'pairing'; stopClusterPolling(); startPeerPolling(); updateQrCode(); }}
         >
-          🔗 Quick Pair & Mesh
+          🔗 Pair devices
         </button>
         <button
           type="button"
           class="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all {activeTab === 'cluster' ? 'bg-[var(--accent)] text-white shadow-xs' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'} cursor-pointer"
-          onclick={() => { activeTab = 'cluster'; stopScanner(); loadClusterData(); startClusterPolling(); }}
+          onclick={() => { activeTab = 'cluster'; stopPeerPolling(); stopScanner(); loadClusterData(); startClusterPolling(); }}
         >
-          🖥️ Nodes & Models
+          🖥️ Devices & models
         </button>
       </div>
 
@@ -713,6 +759,45 @@
             </div>
           {/if}
 
+          <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">
+                Paired devices ({clusterData?.paired_peers?.length || 0})
+              </span>
+              <span class="text-[10px] text-[var(--text-secondary)]">Pairing is saved across restarts</span>
+            </div>
+
+            {#if !clusterData?.paired_peers || clusterData.paired_peers.length === 0}
+              <div class="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] text-xs text-[var(--text-secondary)] text-center">
+                Devices appear here after Notes confirms their pairing. Network discovery alone does not mark a device as paired.
+              </div>
+            {:else}
+              {#each clusterData.paired_peers as pairedPeer}
+                {@const liveNode = clusterData.discovered_nodes?.find(node => node.node_id === pairedPeer.fingerprint)}
+                <div class="p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] flex flex-col gap-1.5">
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="text-xs font-semibold text-[var(--text-primary)]">{pairedPeer.device_name}</span>
+                    <span class="px-2 py-0.5 rounded text-[10px] {pairedPeer.is_online ? 'bg-emerald-950/40 text-emerald-300' : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'}">
+                      {pairedPeer.is_online ? 'Online now' : 'Paired · offline'}
+                    </span>
+                  </div>
+                  <span class="text-[10px] text-[var(--text-secondary)]">
+                    {#if pairedPeer.is_online}
+                      Connection confirmed by this device. Notes will retry both saved routes automatically.
+                    {:else}
+                      Pairing is saved. It will reconnect automatically when this device is available.
+                    {/if}
+                  </span>
+                  {#if liveNode?.services?.llamacpp?.enabled}
+                    <span class="text-[10px] text-indigo-300">Model endpoint available · llama.cpp</span>
+                  {:else}
+                    <span class="text-[10px] text-[var(--text-secondary)]">No model endpoint is being shared by this device.</span>
+                  {/if}
+                </div>
+              {/each}
+            {/if}
+          </div>
+
           <!-- Discovered & Paired Mesh Peers List -->
           <div class="flex flex-col gap-2">
             <div class="flex items-center justify-between">
@@ -830,16 +915,16 @@
           </div>
         </div>
       {:else}
-        <!-- ── TAB 1: ONE UNIVERSAL QR CODE & ONE-SCAN PAIRING ── -->
+        <!-- ── ONE-TIME DEVICE PAIRING ── -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <!-- Universal QR Code Card -->
           <div class="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] flex flex-col items-center justify-between gap-3 text-center">
             <div class="flex flex-col gap-0.5 items-center">
               <span class="text-xs font-bold text-[var(--text-primary)]">
-                Universal Pairing QR
+                Pair this device
               </span>
               <span class="text-[11px] text-[var(--text-secondary)]">
-                Scan with your phone's camera in Notes to connect instantly
+                Scan once from Notes on your phone. This code stays stable.
               </span>
             </div>
             
@@ -853,9 +938,9 @@
                 </div>
               {:else}
                 <div class="w-48 h-48 flex flex-col items-center justify-center text-slate-400 gap-2 text-center p-2">
-                  <span class="text-3xl">📱</span>
-                  <span class="text-xs font-semibold text-slate-700">Client / Standalone</span>
-                  <span class="text-[10px] text-slate-500 leading-tight">Tap "Scan QR Code" on the right to pair with your PC.</span>
+                  <span class="text-3xl">{hasPairedConnection ? '✓' : '📱'}</span>
+                  <span class="text-xs font-semibold text-slate-700">{hasPairedConnection ? 'Already paired' : 'Waiting for workstation'}</span>
+                  <span class="text-[10px] text-slate-500 leading-tight">{hasPairedConnection ? 'This device keeps its pairing. No repeat scan needed.' : 'Open this screen on your workstation to show its pairing code.'}</span>
                 </div>
               {/if}
             </div>
@@ -906,80 +991,88 @@
 
           <!-- Camera Scanner or Manual Connect Form -->
           <div class="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] flex flex-col gap-3">
-            <!-- Connection Status Pill -->
-            <div class="p-2.5 rounded-lg border flex items-center justify-between gap-2 {currentServerUrl ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-300' : 'bg-[var(--card)] border-[var(--border)] text-[var(--text-secondary)]'}">
-              <div class="flex flex-col text-xs">
-                {#if currentServerUrl}
-                  <span class="font-bold flex items-center gap-1.5">🟢 Connected to Server</span>
-                  <span class="font-mono text-[10px] text-emerald-200 truncate">{currentServerUrl}</span>
-                {:else}
-                  <span class="font-bold text-[var(--text-primary)]">📱 Standalone / Offline Mode</span>
-                  <span class="text-[10px]">Notes stored locally. Scan PC screen to link.</span>
+            {#if pairInfo?.pairing_payload && !hasPairedConnection}
+              <div class="flex flex-col gap-3 h-full justify-center">
+                <div class="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/40 text-emerald-300">
+                  <span class="block text-sm font-bold">Workstation ready</span>
+                  <span class="block mt-1 text-xs text-emerald-100">Scan the code once with Notes on your phone. The phone will confirm here after the workstation saves the pairing.</span>
+                </div>
+                <div class="p-3 rounded-xl bg-[var(--card)] border border-[var(--border)] text-xs flex flex-col gap-2">
+                  <span class="font-semibold text-[var(--text-primary)]">Automatic connection routes</span>
+                  <span class="text-[var(--text-secondary)]">Wi-Fi: {pairInfo.lan_url || 'Not available on this network'}</span>
+                  <span class="text-[var(--text-secondary)]">Tailscale: {pairInfo.tailscale_url || 'Not detected (Wi-Fi pairing still works)'}</span>
+                </div>
+                {#if registerMessage}
+                  <div class="p-2.5 rounded-lg border text-[11px] text-[var(--text-secondary)]" role="status" aria-live="polite">{registerMessage}</div>
                 {/if}
               </div>
-              {#if currentServerUrl}
+            {:else if hasPairedConnection}
+              <div class="flex flex-col gap-3 h-full justify-center">
+                <div class="p-3 rounded-xl border {connectionState === 'online' ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-300' : 'bg-amber-950/30 border-amber-500/40 text-amber-200'}" role="status" aria-live="polite">
+                  <span class="block text-sm font-bold">{connectionState === 'online' ? 'Paired · Online' : 'Paired · reconnecting'}</span>
+                  <span class="block mt-1 text-xs">{connectionState === 'online' ? `Using ${connectionRoute || 'the best available route'}` : 'Your pairing is saved. Notes is retrying Wi-Fi and Tailscale.'}</span>
+                </div>
+                <p class="text-xs text-[var(--text-secondary)]">You only need to scan once. If you want to connect to a different workstation, disconnect and scan its code.</p>
                 <button
                   type="button"
-                  class="px-2 py-1 rounded text-[11px] bg-red-950/40 hover:bg-red-900/40 text-red-300 border border-red-500/40 transition-colors cursor-pointer shrink-0"
+                  class="self-start px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-950/40 hover:bg-red-900/40 text-red-300 border border-red-500/40 cursor-pointer"
                   onclick={handleDisconnect}
-                >
-                  Disconnect
-                </button>
-              {/if}
-            </div>
+                >Disconnect</button>
+                {#if registerMessage}
+                  <div class="p-2.5 rounded-lg border text-[11px] {registerMessage.startsWith('Paired with') ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300' : 'bg-red-950/30 border-red-500/40 text-red-300'}" role="status" aria-live="polite">{registerMessage}</div>
+                {/if}
+              </div>
+            {:else}
+              <div class="flex flex-col gap-3">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex flex-col text-xs">
+                    <span class="font-bold text-[var(--text-primary)]">Pair with your workstation</span>
+                    <span class="text-[10px] text-[var(--text-secondary)]">Scan its QR code. Pairing is saved only after the workstation confirms it.</span>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isConnecting}
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50 {isScanning ? 'bg-red-500/20 text-red-400 border border-red-500/40 hover:bg-red-500/30' : 'bg-[var(--accent)] text-white hover:opacity-90'}"
+                    onclick={isScanning ? stopScanner : startScanner}
+                  >
+                    <span>{isScanning ? '⏹ Stop Scanner' : (isConnecting ? 'Connecting…' : '📷 Scan QR Code')}</span>
+                  </button>
+                </div>
 
-            <!-- Scanner Launch Button -->
-            <div class="flex items-center justify-between gap-2">
-              <span class="text-xs font-semibold text-[var(--text-primary)]">Scan Remote Screen</span>
-              <button
-                type="button"
-                class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer {isScanning ? 'bg-red-500/20 text-red-400 border border-red-500/40 hover:bg-red-500/30' : 'bg-[var(--accent)] text-white hover:opacity-90'}"
-                onclick={isScanning ? stopScanner : startScanner}
-              >
-                <span>{isScanning ? '⏹ Stop Scanner' : '📷 Scan QR Code'}</span>
-              </button>
-            </div>
+                {#if isScanning}
+                  <div class="rounded-xl overflow-hidden border border-[var(--accent)] bg-black/95 p-3 flex flex-col items-center gap-2 shadow-inner">
+                    <div id="qr-reader" class="w-full max-w-[240px] rounded-lg overflow-hidden bg-black"></div>
+                    <span class="text-[11px] text-slate-300 font-medium animate-pulse">Align the camera with the workstation code</span>
+                    <button type="button" class="text-[11px] text-red-400 hover:text-red-300 font-medium hover:underline cursor-pointer" onclick={stopScanner}>Cancel</button>
+                  </div>
+                {/if}
 
-            {#if isScanning}
-              <div class="rounded-xl overflow-hidden border border-[var(--accent)] bg-black/95 p-3 flex flex-col items-center gap-2 shadow-inner">
-                <div id="qr-reader" class="w-full max-w-[240px] rounded-lg overflow-hidden bg-black"></div>
-                <span class="text-[11px] text-slate-300 font-medium animate-pulse">📷 Align camera over the QR code on PC</span>
+                {#if scannerError}
+                  <div class="p-2.5 rounded-lg bg-red-950/40 border border-red-500/40 text-[11px] text-red-300 flex flex-col gap-1">
+                    <span class="font-semibold">Camera unavailable</span>
+                    <span>{scannerError}</span>
+                  </div>
+                {/if}
+
+                <label for="pairing-code" class="text-[11px] text-[var(--text-secondary)]">Or paste the pairing code copied from the workstation.</label>
+                <textarea
+                  id="pairing-code"
+                  bind:value={inputToken}
+                  placeholder={`{"type":"NOTES_PAIR","name":"...","lan_url":"...","access_token":"…"}`}
+                  class="w-full min-h-[75px] p-2.5 rounded-lg bg-[var(--card)] border border-[var(--border)] text-xs font-mono text-[var(--text-primary)] resize-none focus:outline-hidden focus:border-[var(--accent)]"
+                ></textarea>
                 <button
-                  type="button"
-                  class="text-[11px] text-red-400 hover:text-red-300 font-medium hover:underline cursor-pointer"
-                  onclick={stopScanner}
+                  class="px-4 py-2 rounded-lg text-xs font-semibold bg-[var(--accent)] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
+                  disabled={isConnecting || !inputToken.trim()}
+                  onclick={() => handleConnectPayload(inputToken)}
                 >
-                  Cancel Scanner
+                  {isConnecting ? 'Checking and pairing…' : 'Pair with code'}
                 </button>
-              </div>
-            {/if}
-
-            {#if scannerError}
-              <div class="p-2.5 rounded-lg bg-red-950/40 border border-red-500/40 text-[11px] text-red-300 flex flex-col gap-1">
-                <span class="font-semibold">⚠️ Camera error</span>
-                <span>{scannerError}</span>
-                <span class="text-[10px] text-slate-400">Make sure camera permissions are granted, or paste the connection URL below.</span>
-              </div>
-            {/if}
-
-            <p class="text-[11px] text-[var(--text-secondary)]">Or paste pairing code or backend URL manually:</p>
-
-            <textarea
-              bind:value={inputToken}
-              placeholder={`http://192.168.0.45:5000 or {"v": 2, "name": "...", "lan_url": "..."}`}
-              class="w-full flex-1 min-h-[75px] p-2.5 rounded-lg bg-[var(--card)] border border-[var(--border)] text-xs font-mono text-[var(--text-primary)] resize-none focus:outline-hidden focus:border-[var(--accent)]"
-            ></textarea>
-
-            <button
-              class="px-4 py-2 rounded-lg text-xs font-semibold bg-[var(--accent)] text-white hover:opacity-90 transition-opacity cursor-pointer"
-              onclick={() => handleConnectPayload(inputToken)}
-            >
-              Connect & Pair Device
-            </button>
-
-            {#if registerMessage}
-              <div class="p-2.5 rounded-lg border text-[11px] font-mono {registerMessage.includes('❌') || registerMessage.includes('Error') || registerMessage.includes('Failed') ? 'bg-red-950/30 border-red-500/40 text-red-400' : (registerMessage.includes('🎉') ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300' : 'bg-slate-800 border-slate-700 text-slate-200')}">
-                {registerMessage}
+                {#if registerMessage}
+                  <div class="p-2.5 rounded-lg border text-[11px] {registerMessage.startsWith('Paired with') ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300' : (isConnecting ? 'bg-slate-800 border-slate-700 text-slate-200' : 'bg-red-950/30 border-red-500/40 text-red-300')}" role="status" aria-live="polite">
+                    {registerMessage}
+                  </div>
+                {/if}
               </div>
             {/if}
           </div>
@@ -987,22 +1080,25 @@
 
         <!-- Paired Peers List -->
         <div class="flex-1 overflow-y-auto min-h-0 flex flex-col gap-2">
-          <span class="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Paired Mesh Devices ({peers.length})</span>
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Paired devices ({peers.length})</span>
+            <span class="text-[10px] text-[var(--text-secondary)]">Pair once · reconnects automatically</span>
+          </div>
           {#if peers.length === 0}
             <div class="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] text-xs text-[var(--text-secondary)] text-center">
-              No remote devices paired yet. Open Notes Workstation on your Android phone and scan this screen to connect!
+              {peerListError || 'No devices have paired yet. Scan this workstation’s code from Notes on your phone.'}
             </div>
           {:else}
             {#each peers as peer}
               <div class="p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] flex items-center justify-between text-xs">
                 <div class="flex items-center gap-2">
-                  <span class="w-2 h-2 rounded-full {peer.is_active ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}"></span>
+                  <span class="w-2 h-2 rounded-full {peer.is_online ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}"></span>
                   <div class="flex flex-col">
                     <span class="font-semibold text-[var(--text-primary)]">{peer.device_name}</span>
-                    <span class="text-[10px] text-[var(--text-secondary)] font-mono">{peer.magic_dns || peer.tailscale_ip || 'Paired Device'} • {peer.fingerprint?.substring(0, 18)}...</span>
+                    <span class="text-[10px] text-[var(--text-secondary)]">{peer.is_online ? 'Connected now · network routes switch automatically' : 'Paired · will reconnect when available'}</span>
                   </div>
                 </div>
-                <span class="px-2 py-0.5 rounded text-[10px] bg-[var(--bg-tertiary)] text-[var(--accent)] font-mono">Mesh Active</span>
+                <span class="px-2 py-0.5 rounded text-[10px] {peer.is_online ? 'bg-emerald-950/40 text-emerald-300' : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'}">{peer.is_online ? 'Online' : 'Paired'}</span>
               </div>
             {/each}
           {/if}

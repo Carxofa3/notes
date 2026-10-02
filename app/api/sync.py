@@ -43,7 +43,9 @@ class PeerList(Resource):
             'message': 'Peer registered successfully',
             'peer_id': peer.id,
             'device_name': peer.device_name,
-            'magic_dns': peer.magic_dns
+            'magic_dns': peer.magic_dns,
+            'fingerprint': peer.fingerprint,
+            'last_seen': peer.last_seen.isoformat() if peer.last_seen else None
         }, 201
 
 @ns.route('/delta')

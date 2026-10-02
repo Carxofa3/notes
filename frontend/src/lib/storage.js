@@ -9,7 +9,8 @@ const STORAGE_KEYS = {
   UNITS: 'notes_offline_units',
   NOTES: 'notes_offline_notes',
   SERVER_URL: 'notes_server_url',
-  PAIRED_CONNECTION: 'notes_paired_connection'
+  PAIRED_CONNECTION: 'notes_paired_connection',
+  DEVICE_ID: 'notes_device_id'
 };
 
 // Clean slate: Zero sample or mock data
@@ -83,6 +84,23 @@ export function setServerUrl(url) {
 export function getPairedConnection() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.PAIRED_CONNECTION) || 'null'); }
   catch (_) { return null; }
+}
+
+export function getDeviceId() {
+  let deviceId = localStorage.getItem(STORAGE_KEYS.DEVICE_ID);
+  if (deviceId) return deviceId;
+
+  const bytes = new Uint8Array(16);
+  if (globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(bytes);
+  } else {
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = Math.floor(Math.random() * 256);
+    }
+  }
+  deviceId = `device-${Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('')}`;
+  localStorage.setItem(STORAGE_KEYS.DEVICE_ID, deviceId);
+  return deviceId;
 }
 
 export function setPairedConnection(payload, activeUrl) {

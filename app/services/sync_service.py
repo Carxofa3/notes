@@ -5,6 +5,9 @@ import hashlib
 import time
 import json
 import threading
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
 import urllib.request
 import urllib.error
 from typing import Dict, Any, List, Optional
@@ -31,7 +34,7 @@ class TailscaleSyncService:
         self._discovered_nodes: Dict[str, Dict[str, Any]] = {}
         self._lock = threading.Lock()
         self._running = False
-        self._node_id = f"node-{socket.gethostname().lower()}-{int(time.time()) % 10000}"
+        self._node_id = self._load_or_create_node_id()
         
         # Local node capabilities & settings
         self._custom_name: Optional[str] = None
@@ -41,6 +44,31 @@ class TailscaleSyncService:
         self._active_llm_provider: Optional[str] = None
 
         self._start_discovery_services()
+
+    @staticmethod
+    def _load_or_create_node_id() -> str:
+        """Keep this device's mesh identity stable across app restarts."""
+        identity_dir = Path.home() / ".notes_workstation"
+        identity_path = identity_dir / "device_id"
+        try:
+            identity_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+            existing = identity_path.read_text(encoding="ascii").strip()
+            if existing.startswith("node-") and len(existing) >= 20:
+                return existing
+        except (OSError, UnicodeError):
+            pass
+
+        node_id = f"node-{uuid.uuid4()}"
+        try:
+            identity_path.write_text(node_id, encoding="ascii")
+            try:
+                identity_path.chmod(0o600)
+            except OSError:
+                pass
+        except OSError:
+            # Preserve a usable process identity if the profile is read-only.
+            pass
+        return node_id
 
     def _start_discovery_services(self):
         """Start background UDP broadcast and listener for zero-config node mesh"""
@@ -274,6 +302,7 @@ class TailscaleSyncService:
         return {
             "local_node": local_node,
             "discovered_nodes": discovered,
+            "paired_peers": self.list_peers(),
             "active_llm_provider": self._active_llm_provider
         }
 
@@ -296,7 +325,10 @@ class TailscaleSyncService:
         hostname = socket.gethostname()
         tailscale_ip = self._detect_tailscale_ip()
         lan_ip = self._detect_lan_ip()
-        magic_dns = f"{hostname.lower()}.tailnet.ts.net"
+        if lan_ip.startswith("127.") or lan_ip == "0.0.0.0":
+            lan_ip = None
+        # Do not advertise a guessed MagicDNS name; only advertise routable IPs.
+        magic_dns = None
         fingerprint = self._get_or_create_fingerprint()
 
         return {
@@ -313,35 +345,38 @@ class TailscaleSyncService:
                 "type": "NOTES_PAIR",
                 "v": 2,
                 "name": self.get_node_name(),
-                "lan_url": f"http://{lan_ip}:{self.FLASK_PORT}",
+                "lan_url": f"http://{lan_ip}:{self.FLASK_PORT}" if lan_ip else None,
                 "tailscale_url": f"http://{tailscale_ip}:{self.FLASK_PORT}" if tailscale_ip else None,
                 "lan_ip": lan_ip,
                 "tailscale_ip": tailscale_ip,
                 "http_port": self.FLASK_PORT,
                 "sync_port": self.DEFAULT_PORT,
                 "magic_dns": magic_dns,
-                "fingerprint": fingerprint,
-                "ts": int(time.time())
+                "fingerprint": fingerprint
             }
         }
 
     def register_peer(self, peer_data: Dict[str, Any]) -> TailscalePeer:
         device_name = peer_data.get("device_name") or peer_data.get("name") or "Remote Peer"
-        magic_dns = peer_data.get("magic_dns") or f"{device_name.lower().replace(' ', '-')}.tailnet.ts.net"
+        magic_dns = peer_data.get("magic_dns")
         tailscale_ip = peer_data.get("ip") or peer_data.get("tailscale_ip")
-        port = peer_data.get("port", self.DEFAULT_PORT)
-        fingerprint = peer_data.get("fingerprint") or f"peer-{int(time.time())}"
+        fingerprint = peer_data.get("fingerprint") or "legacy:" + hashlib.sha256(
+            f"{magic_dns or ''}|{device_name}".encode("utf-8")
+        ).hexdigest()[:32]
 
-        existing = TailscalePeer.query.filter(
-            (TailscalePeer.magic_dns == magic_dns) | (TailscalePeer.fingerprint == fingerprint)
-        ).first()
+        existing = TailscalePeer.query.filter_by(fingerprint=fingerprint).first()
+        if existing is None and magic_dns:
+            existing = TailscalePeer.query.filter_by(magic_dns=magic_dns).first()
 
         if existing:
             existing.device_name = device_name
+            existing.magic_dns = magic_dns
             if tailscale_ip:
                 existing.tailscale_ip = tailscale_ip
-            existing.port = port
+            if peer_data.get("port"):
+                existing.port = peer_data["port"]
             existing.is_active = True
+            existing.last_seen = datetime.now(timezone.utc)
             db.session.commit()
             return existing
 
@@ -349,9 +384,10 @@ class TailscaleSyncService:
             device_name=device_name,
             magic_dns=magic_dns,
             tailscale_ip=tailscale_ip,
-            port=port,
+            port=peer_data.get("port", self.DEFAULT_PORT),
             fingerprint=fingerprint,
-            is_active=True
+            is_active=True,
+            last_seen=datetime.now(timezone.utc)
         )
         db.session.add(peer)
         db.session.commit()
@@ -359,16 +395,25 @@ class TailscaleSyncService:
 
     def list_peers(self) -> List[Dict[str, Any]]:
         peers = TailscalePeer.query.all()
-        return [{
-            "id": p.id,
-            "device_name": self.get_peer_alias(str(p.id)) or p.device_name,
-            "tailscale_ip": p.tailscale_ip,
-            "magic_dns": p.magic_dns,
-            "port": p.port,
-            "fingerprint": p.fingerprint,
-            "is_active": p.is_active,
-            "last_seen": p.last_seen.isoformat() if p.last_seen else None
-        } for p in peers]
+        now = datetime.now(timezone.utc)
+        result = []
+        for peer in peers:
+            last_seen = peer.last_seen
+            if last_seen and last_seen.tzinfo is None:
+                last_seen = last_seen.replace(tzinfo=timezone.utc)
+            is_online = bool(last_seen and (now - last_seen).total_seconds() < 90)
+            result.append({
+                "id": peer.id,
+                "device_name": self.get_peer_alias(str(peer.id)) or peer.device_name,
+                "tailscale_ip": peer.tailscale_ip,
+                "magic_dns": peer.magic_dns,
+                "port": peer.port,
+                "fingerprint": peer.fingerprint,
+                "is_active": is_online,
+                "is_online": is_online,
+                "last_seen": peer.last_seen.isoformat() if peer.last_seen else None
+            })
+        return result
 
     def export_crdt_delta(self, note_id: int) -> Optional[bytes]:
         note = db.session.get(Note, note_id)
@@ -421,7 +466,6 @@ class TailscaleSyncService:
         return None
 
     def _get_or_create_fingerprint(self) -> str:
-        seed = f"{socket.gethostname()}-tailscale-notes-cert"
-        return "ed25519:" + hashlib.sha256(seed.encode("utf-8")).hexdigest()[:32]
+        return self._node_id
 
 sync_service = TailscaleSyncService()

@@ -304,7 +304,7 @@ def print_connection_info(flask_port):
 def main():
     parser = argparse.ArgumentParser(description="Notes Desktop Application Launcher")
     parser.add_argument('--port', type=int, default=None, help="Flask backend port")
-    parser.add_argument('--sync-port', type=int, default=58855, help="Yjs P2P Sync WebSocket port")
+    parser.add_argument('--sync-port', type=int, default=None, help="Yjs P2P Sync WebSocket port")
     parser.add_argument('--dev', action='store_true', help="Point to Vite dev server at http://localhost:5173")
     parser.add_argument('--fullscreen', action='store_true', help="Launch in fullscreen mode")
     parser.add_argument('--browser', action='store_true', help="Force open in default web browser instead of webview")
@@ -321,10 +321,14 @@ def main():
     # when the user has already configured the client; LAN remains available.
 
     # 2. Configure the backend before starting the authenticated sync listener.
+    # Windows and VPN software may reserve the conventional port range. Pick an
+    # actually bindable port before advertising the node or starting the sync child.
     sync_port = args.sync_port or find_free_port(58855)
     # 3. Import and start Flask app on a guaranteed free port
     from app import create_app
     flask_app = create_app(os.getenv('FLASK_CONFIG') or 'default')
+    from app.services.sync_service import sync_service
+    sync_service.DEFAULT_PORT = sync_port
 
     # 4. Start Yjs sync only with the same secret embedded in the local pairing QR.
     sync_proc = start_sync_server(
