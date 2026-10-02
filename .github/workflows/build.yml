@@ -298,6 +298,7 @@ jobs:
 
           - Pairing QR codes stay stable while displayed; phones only report success after the workstation confirms registration.
           - Paired devices appear in the device list with live online status and retry saved Wi-Fi and Tailscale routes automatically.
+          - Android release builds can reach the workstation over local Wi-Fi, and Disconnect removes the phone from both devices.
           - Workstation identity and phone identity persist across restarts, so pairing is a one-time step.
           - Network discovery no longer advertises loopback addresses or guessed Tailscale DNS names.
           - Remote API and WebSocket access require the private credential exchanged by the pairing QR code.

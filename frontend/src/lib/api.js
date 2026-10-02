@@ -379,6 +379,21 @@ export async function registerPeer(peerData, targetServerUrl = null, accessToken
   return data;
 }
 
+export async function removePeer(fingerprint, targetServerUrl = null, accessToken = '') {
+  const base = targetServerUrl ? targetServerUrl.replace(/\/+$/, '') : getBase();
+  if (!base) throw new Error('No paired workstation is configured.');
+  const encodedFingerprint = encodeURIComponent(fingerprint || '');
+  const res = await safeFetch(`${base}/api/sync/peers/${encodedFingerprint}`, {
+    method: 'DELETE'
+  }, 4000, accessToken);
+  if (!res) throw new Error('Could not reach the workstation to remove this device.');
+  if (!res.ok && res.status !== 404) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error(detail.message || `Could not remove this device (${res.status}).`);
+  }
+  return true;
+}
+
 // --- Cluster & Nodes Management ---
 export async function fetchClusterOverview() {
   const base = getBase();

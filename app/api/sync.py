@@ -48,6 +48,14 @@ class PeerList(Resource):
             'last_seen': peer.last_seen.isoformat() if peer.last_seen else None
         }, 201
 
+@ns.route('/peers/<string:fingerprint>')
+class PeerItem(Resource):
+    def delete(self, fingerprint):
+        """Forget one paired device by its stable fingerprint."""
+        if not sync_service.remove_peer(fingerprint):
+            return {'message': 'Paired device was not found.'}, 404
+        return {'message': 'Paired device removed.'}, 200
+
 @ns.route('/delta')
 class CrdtDelta(Resource):
     @ns.expect(crdt_delta_model, validate=True)

@@ -43,7 +43,7 @@
   let storageStats = $state({ lessons: 0, units: 0, notes: 0 });
 
   // About & Auto-Updater State
-  let currentAppVer = $state(`v${typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.1.9'}`);
+  let currentAppVer = $state(`v${typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.1.15'}`);
   let updateInfo = $state(null);
   let isCheckingUpdate = $state(false);
   let updateError = $state('');

@@ -69,7 +69,7 @@ Section "Notes Workstation (required)" SecCore
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\NotesWorkstation" "DisplayIcon" "$INSTDIR\icon.ico"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\NotesWorkstation" "UninstallString" '"$INSTDIR\Uninstall.exe"'
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\NotesWorkstation" "Publisher" "Notes Team"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\NotesWorkstation" "DisplayVersion" "2.1.14"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\NotesWorkstation" "DisplayVersion" "2.1.15"
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\NotesWorkstation" "NoModify" 1
   WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\NotesWorkstation" "NoRepair" 1
 

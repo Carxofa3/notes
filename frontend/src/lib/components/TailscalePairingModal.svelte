@@ -7,6 +7,7 @@
     fetchPairInfo,
     fetchPeers,
     registerPeer,
+    removePeer,
     getServerUrl,
     fetchClusterOverview,
     updateSelfConfig,
@@ -22,7 +23,7 @@
 
   let { isOpen = $bindable(false) } = $props();
 
-  let currentAppVer = $state('v2.1.14');
+  let currentAppVer = $state('v2.1.15');
   let pairInfo = $state(null);
   let localWifiUrl = $derived(
     pairInfo?.pairing_payload?.lan_url ||
@@ -416,7 +417,17 @@
     }
   }
 
-  function handleDisconnect() {
+  async function handleDisconnect() {
+    const saved = getPairedConnection();
+    const identity = peerIdentity();
+    if (saved?.accessToken && saved?.activeUrl) {
+      try {
+        await removePeer(identity.fingerprint, saved.activeUrl, saved.accessToken);
+      } catch (err) {
+        registerMessage = err.message || 'Could not remove this device from the workstation.';
+        return;
+      }
+    }
     clearPairedConnection();
     hasPairedConnection = false;
     currentServerUrl = '';

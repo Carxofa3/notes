@@ -415,6 +415,15 @@ class TailscaleSyncService:
             })
         return result
 
+    def remove_peer(self, fingerprint: str) -> bool:
+        """Forget a paired device identified by its stable fingerprint."""
+        peer = TailscalePeer.query.filter_by(fingerprint=fingerprint).first()
+        if peer is None:
+            return False
+        db.session.delete(peer)
+        db.session.commit()
+        return True
+
     def export_crdt_delta(self, note_id: int) -> Optional[bytes]:
         note = db.session.get(Note, note_id)
         if not note or not note.crdt_state:
