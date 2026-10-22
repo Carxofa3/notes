@@ -531,7 +531,7 @@ export async function fetchAppVersion() {
  */
 export async function checkAppUpdatesDirect(platform = '') {
   const GITHUB_REPO = 'Carxofa3/notes';
-  const currentVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0';
+  const currentVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.1.16';
 
   try {
     const resp = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {

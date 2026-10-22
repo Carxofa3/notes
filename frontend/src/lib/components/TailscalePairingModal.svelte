@@ -23,7 +23,7 @@
 
   let { isOpen = $bindable(false) } = $props();
 
-  let currentAppVer = $state('v2.1.15');
+  let currentAppVer = $state(`v${typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.1.16'}`);
   let pairInfo = $state(null);
   let localWifiUrl = $derived(
     pairInfo?.pairing_payload?.lan_url ||

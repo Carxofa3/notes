@@ -5,6 +5,7 @@
     setServerUrl, 
     pingServer,
     checkAppUpdates,
+    fetchAppVersion,
     fetchGlinerStatus,
     triggerGlinerDownload,
     checkLocalLlamaCppHealth,
@@ -43,7 +44,7 @@
   let storageStats = $state({ lessons: 0, units: 0, notes: 0 });
 
   // About & Auto-Updater State
-  let currentAppVer = $state(`v${typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.1.15'}`);
+  let currentAppVer = $state(`v${typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '2.1.16'}`);
   let updateInfo = $state(null);
   let isCheckingUpdate = $state(false);
   let updateError = $state('');
@@ -56,6 +57,9 @@
       activeTab = initialTab || 'appearance';
       serverInput = getServerUrl();
       loadStorageStats();
+      fetchAppVersion().then(v => {
+        if (v && v.version) currentAppVer = v.version;
+      }).catch(() => {});
       if (activeTab === 'compute') {
         loadComputeData();
       }
@@ -179,6 +183,7 @@
       const res = await checkAppUpdates(detectedPlatform);
       if (res) {
         updateInfo = res;
+        if (res.current_version) currentAppVer = res.current_version;
       } else {
         updateError = 'Could not reach GitHub. Check your network connection.';
       }
