@@ -18,15 +18,9 @@ def create_app(config_name='default'):
     app.before_request(protect_remote_api)
 
     # Cross-origin mobile requests use explicit bearer tokens, never cookies.
-    CORS(app, resources={
-        r"/*": {
-            "origins": [
-                "http://tauri.localhost",
-                "tauri://localhost",
-                r"^https?://(localhost|127\.0\.0\.1):588[5-9][0-9]$"
-            ]
-        }
-    }, supports_credentials=False)
+    # Allowing all origins with supports_credentials=False enables mobile/Tailscale/LAN access
+    # while protect_remote_api strictly requires the 48-byte cryptographically secure token.
+    CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=False)
 
     db.init_app(app)
     migrate.init_app(app, db)
@@ -36,6 +30,19 @@ def create_app(config_name='default'):
         try:
             from .models import models as _models  # noqa: F401 - ensures all models are loaded
             db.create_all()
+            # Ensure SQLite columns exist if upgrading an older notes.db
+            with db.engine.connect() as conn:
+                for table, col, col_type, default_val in [
+                    ("unit", "icon", "VARCHAR(50)", "'📁'"),
+                    ("unit", "color", "VARCHAR(20)", "'#10b981'"),
+                    ("lesson", "icon", "VARCHAR(50)", "'📚'"),
+                    ("lesson", "color", "VARCHAR(20)", "'#3b82f6'"),
+                ]:
+                    try:
+                        conn.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type} DEFAULT {default_val}"))
+                        conn.commit()
+                    except Exception:
+                        pass
         except Exception as e:
             print(f"[Database] Warning during auto-table creation: {e}")
 

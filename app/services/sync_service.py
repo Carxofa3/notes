@@ -1,4 +1,5 @@
 # app/services/sync_service.py
+import sys
 import socket
 import os
 import hashlib
@@ -80,16 +81,35 @@ class TailscaleSyncService:
         beacon_thread.start()
 
     def _detect_lan_ip(self) -> str:
-        """Find local LAN IPv4 address (e.g. 192.168.x.x or 10.x.x.x)"""
+        """Find local LAN IPv4 address (e.g. 192.168.x.x or 10.x.x.x), prioritizing real network interfaces."""
+        # 1. Try outbound socket probe to determine default route
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            # Connecting to a public address does not send packets but picks the default interface
             s.connect(("8.8.8.8", 80))
             lan_ip = s.getsockname()[0]
             s.close()
-            return lan_ip
+            if lan_ip and not lan_ip.startswith("127.") and not lan_ip.startswith("100."):
+                return lan_ip
         except Exception:
-            return "127.0.0.1"
+            pass
+
+        # 2. Inspect all local interface addresses
+        try:
+            _, _, ips = socket.gethostbyname_ex(socket.gethostname())
+            candidates = [
+                ip for ip in ips
+                if not ip.startswith("127.") and not ip.startswith("100.")
+            ]
+            # Exclude virtualbox host-only adapters (192.168.56.x) if other LAN interfaces exist
+            non_vbox = [ip for ip in candidates if not ip.startswith("192.168.56.")]
+            if non_vbox:
+                return non_vbox[0]
+            if candidates:
+                return candidates[0]
+        except Exception:
+            pass
+
+        return "127.0.0.1"
 
     def get_node_id(self) -> str:
         return self._node_id
@@ -462,7 +482,16 @@ class TailscaleSyncService:
                 except Exception:
                     pass
 
-        # 2. Try socket.getaddrinfo fallback
+        # 2. Try socket.gethostbyname_ex to detect assigned 100.x.y.z interface
+        try:
+            _, _, ips = socket.gethostbyname_ex(socket.gethostname())
+            for ip in ips:
+                if ip.startswith("100."):
+                    return ip
+        except Exception:
+            pass
+
+        # 3. Try socket.getaddrinfo fallback
         try:
             addrs = socket.getaddrinfo(socket.gethostname(), None)
             for addr in addrs:

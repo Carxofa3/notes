@@ -8,7 +8,6 @@
   import { markdown } from '@codemirror/lang-markdown';
   import { Table } from '@lezer/markdown';
   import {
-    livePreviewPlugin,
     markdownStylePlugin,
     editorTheme,
     mouseSelectingField,
@@ -21,8 +20,10 @@
     linkPlugin,
     initHighlighter
   } from 'codemirror-live-markdown';
+  import { enhancedLivePreviewPlugin } from '../livePreviewEnhanced.js';
+  import { mediaEmbedPlugin } from '../mediaEmbed.js';
   import { chatGptCodeBlockField } from '../codeblock.js';
-  import { synthesizeLectureNotes } from '../api.js';
+  import { synthesizeLectureNotes, uploadMediaFile } from '../api.js';
 
   let {
     note = null,
@@ -40,10 +41,12 @@
   let isLivePreview = $state(true);
   let isSaving = $state(false);
   let isSynthesizing = $state(false);
+  let isUploadingMedia = $state(false);
   let wordCount = $state(0);
   let charCount = $state(0);
 
   let editorContainer = $state(null);
+  let mediaFileInput = $state(null);
   let editorView = null;
   const livePreviewCompartment = new Compartment();
   let currentNoteId = null;
@@ -117,6 +120,44 @@
     }
   });
 
+  async function handleMediaInsert(file) {
+    if (!file) return;
+    isUploadingMedia = true;
+    try {
+      const res = await uploadMediaFile(file, note?.id);
+      if (res && res.url) {
+        let snippet = '';
+        const lowerName = (file.name || '').toLowerCase();
+        const mime = file.type || '';
+
+        if (mime.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(lowerName)) {
+          snippet = `\n![${res.filename || file.name || 'Image'}](${res.url})\n`;
+        } else if (mime.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(lowerName)) {
+          snippet = `\n<audio controls src="${res.url}" style="width: 100%; margin: 8px 0;"></audio>\n`;
+        } else if (mime.startsWith('video/') || /\.(mp4|webm|ogv|mov|m4v)$/i.test(lowerName)) {
+          snippet = `\n<video controls src="${res.url}" style="max-width: 100%; border-radius: 8px; margin: 8px 0;"></video>\n`;
+        } else {
+          snippet = `\n[📎 ${res.filename || file.name}](${res.url})\n`;
+        }
+
+        insertText(snippet);
+      }
+    } catch (err) {
+      console.error('Failed to process media file:', err);
+    } finally {
+      isUploadingMedia = false;
+    }
+  }
+
+  async function handleMediaFilesSelected(e) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    for (const f of files) {
+      await handleMediaInsert(f);
+    }
+    e.target.value = '';
+  }
+
   function initCodeMirror() {
     if (!editorContainer || editorView) return;
 
@@ -152,6 +193,32 @@
       },
       '.cm-activeLine': {
         backgroundColor: 'rgba(255, 255, 255, 0.03)'
+      },
+      // Keep numeric list indices clearly visible in proper format at all times
+      '.cm-list-mark-ordered': {
+        display: 'inline !important',
+        fontSize: '1em !important',
+        fontWeight: '700 !important',
+        color: 'var(--accent) !important',
+        opacity: '1 !important',
+        marginRight: '0.35rem !important',
+        transition: 'none !important'
+      },
+      '.cm-list-mark-bullet': {
+        display: 'inline !important',
+        fontSize: '1em !important',
+        fontWeight: 'bold !important',
+        color: 'var(--accent) !important',
+        opacity: '0.85 !important',
+        marginRight: '0.25rem !important',
+        transition: 'none !important'
+      },
+      // Remove all CSS transitions so arrow keys move smoothly without DOM jitter
+      '.cm-formatting-block, .cm-formatting-inline': {
+        transition: 'none !important'
+      },
+      '.cm-formatting-block-visible, .cm-formatting-inline-visible': {
+        transition: 'none !important'
       }
     });
 
@@ -166,7 +233,7 @@
         markdown({ extensions: [Table] }),
         livePreviewCompartment.of(collapseOnSelectionFacet.of(isLivePreview)),
         mouseSelectingField,
-        livePreviewPlugin,
+        enhancedLivePreviewPlugin,
         markdownStylePlugin,
         editorTheme,
         baseTheme,
@@ -175,6 +242,7 @@
         tableField,
         chatGptCodeBlockField(),
         imageField({ maxWidth: '100%' }),
+        mediaEmbedPlugin,
         linkPlugin(),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
@@ -204,7 +272,7 @@
     };
     document.addEventListener('mouseup', handleMouseUp);
 
-    // Touch selection support for Android/iOS
+    // Touch selection support for mobile
     editorView.contentDOM.addEventListener('touchstart', () => {
       editorView?.dispatch({ effects: setMouseSelecting.of(true) });
     }, { passive: true });
@@ -216,6 +284,56 @@
       });
     };
     document.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+    // Copy-paste media handler (Images, Audio, Video)
+    editorView.dom.addEventListener('paste', async (e) => {
+      const clipboard = e.clipboardData;
+      if (!clipboard) return;
+      const files = [];
+      if (clipboard.files && clipboard.files.length > 0) {
+        for (let i = 0; i < clipboard.files.length; i++) {
+          files.push(clipboard.files[i]);
+        }
+      } else if (clipboard.items) {
+        for (let i = 0; i < clipboard.items.length; i++) {
+          const item = clipboard.items[i];
+          if (item.kind === 'file') {
+            const f = item.getAsFile();
+            if (f) files.push(f);
+          }
+        }
+      }
+
+      if (files.length > 0) {
+        const mediaFiles = files.filter(f =>
+          f.type.startsWith('image/') || f.type.startsWith('audio/') || f.type.startsWith('video/')
+        );
+        if (mediaFiles.length > 0) {
+          e.preventDefault();
+          for (const f of mediaFiles) {
+            await handleMediaInsert(f);
+          }
+        }
+      }
+    });
+
+    // Drag and drop media handler (Images, Audio, Video)
+    editorContainer.addEventListener('dragover', (e) => {
+      e.preventDefault();
+    });
+    editorContainer.addEventListener('drop', async (e) => {
+      const transfer = e.dataTransfer;
+      if (!transfer || !transfer.files || transfer.files.length === 0) return;
+      const mediaFiles = Array.from(transfer.files).filter(f =>
+        f.type.startsWith('image/') || f.type.startsWith('audio/') || f.type.startsWith('video/')
+      );
+      if (mediaFiles.length > 0) {
+        e.preventDefault();
+        for (const f of mediaFiles) {
+          await handleMediaInsert(f);
+        }
+      }
+    });
   }
 
   export function toggleLivePreview() {
@@ -312,7 +430,7 @@
     try {
       const res = await synthesizeLectureNotes(content);
       if (res && res.synthesized_content) {
-        insertText(`\n\n## 🎓 AI Lecture Study Guide & Key Formulas\n${res.synthesized_content}\n`);
+        insertText(`\n\n## 🎓 Lecture Study Guide & Key Formulas\n${res.synthesized_content}\n`);
       }
     } catch (e) {
       console.error('Study guide synthesis failed:', e);
@@ -336,7 +454,17 @@
         style="color: var(--text-primary) !important; caret-color: var(--accent) !important;"
       />
 
-      <!-- Obsidian Live Preview Toggle -->
+      <!-- Hidden file dialog for Images, Audio, Video -->
+      <input
+        type="file"
+        bind:this={mediaFileInput}
+        accept="image/*,audio/*,video/*"
+        multiple
+        class="hidden"
+        onchange={handleMediaFilesSelected}
+      />
+
+      <!-- Live Preview Toggle -->
       <button
         class="px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 border shadow-xs shrink-0 {isLivePreview ? 'bg-[var(--accent)] text-white border-[var(--accent)]' : 'bg-[var(--card)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border-[var(--border)]'}"
         onclick={toggleLivePreview}
@@ -366,6 +494,11 @@
           title="Heading 2"
         >H2</button>
         <button
+          class="px-2 py-0.5 rounded hover:bg-[var(--card)] text-xs text-[var(--text-primary)] font-medium"
+          onclick={() => formatLinePrefix('1. ')}
+          title="Numbered List"
+        >1. List</button>
+        <button
           class="px-2 py-0.5 rounded hover:bg-[var(--card)] text-xs text-[var(--text-primary)]"
           onclick={() => formatLinePrefix('- ')}
           title="Bullet List"
@@ -376,6 +509,21 @@
           title="Task Checkbox"
         >[ ]</button>
       </div>
+
+      <!-- Media Attachment Button (Images, Audio, Video) -->
+      <button
+        class="shrink-0 px-2 py-1 rounded-lg text-xs font-medium bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--accent)] flex items-center gap-1 shadow-xs transition-colors"
+        onclick={() => mediaFileInput?.click()}
+        disabled={isUploadingMedia}
+        title="Insert Media: Image, Audio, or Video (or paste / drag-and-drop)"
+      >
+        {#if isUploadingMedia}
+          <span class="animate-spin inline-block w-3 h-3 border-2 border-[var(--accent)] border-t-transparent rounded-full"></span>
+          <span>Uploading...</span>
+        {:else}
+          <span>📎 Media</span>
+        {/if}
+      </button>
 
       <button
         class="shrink-0 px-2 py-1 rounded-lg text-xs font-medium bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--accent)] flex items-center gap-1 shadow-xs"
@@ -409,7 +557,7 @@
         <span>📈 Plot</span>
       </button>
 
-      <!-- AI Study Guide Synthesis -->
+      <!-- Study Guide Synthesis -->
       <button
         class="shrink-0 px-2 py-1 rounded-lg text-xs font-medium bg-indigo-950/40 hover:bg-indigo-900/50 border border-indigo-500/40 text-indigo-300 flex items-center gap-1 shadow-xs transition-colors"
         onclick={handleSynthesizeStudyGuide}
@@ -462,7 +610,9 @@
     </div>
 
     <div class="flex items-center gap-2">
-      {#if isSaving}
+      {#if isUploadingMedia}
+        <span class="text-[var(--accent)] font-medium">Embedding media...</span>
+      {:else if isSaving}
         <span class="text-[var(--accent)] font-medium">Saving...</span>
       {:else}
         <span class="text-emerald-400">✓ Saved Offline</span>

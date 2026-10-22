@@ -17,6 +17,7 @@
     { label: 'B', title: 'Bold', class: 'font-bold', action: () => onInsertText('**bold**') },
     { label: 'I', title: 'Italic', class: 'italic', action: () => onInsertText('*italic*') },
     { label: 'H2', title: 'Heading 2', class: 'font-semibold', action: () => onInsertText('\n## Heading\n') },
+    { label: '1. List', title: 'Numbered List', action: () => onInsertText('\n1. ') },
     { label: '• List', title: 'Bullet List', action: () => onInsertText('\n- ') },
     { label: '[ ]', title: 'Task Checkbox', action: () => onInsertText('\n- [ ] ') },
     { label: '`Code`', title: 'Inline Code', class: 'font-mono text-[11px]', action: () => onInsertText('`code`') },

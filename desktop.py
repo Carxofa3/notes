@@ -317,8 +317,9 @@ def main():
     root_dir = os.path.abspath(os.path.dirname(__file__))
     os.chdir(root_dir)
 
-    # Do not attempt to install, start, or authenticate Tailscale. Use it only
-    # when the user has already configured the client; LAN remains available.
+    # 1. Start or detect Tailscale if requested (runs asynchronously so startup remains instant)
+    if args.tailscale:
+        start_tailscale(background=True)
 
     # 2. Configure the backend before starting the authenticated sync listener.
     # Windows and VPN software may reserve the conventional port range. Pick an

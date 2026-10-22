@@ -290,21 +290,18 @@ jobs:
             APP_VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
             TAG_NAME="v${APP_VERSION}"
           fi
-          TITLE="Notes Workstation ${TAG_NAME} — Reliable Device Pairing"
+          TITLE="Notes Workstation ${TAG_NAME} — Media Embedding & Enhanced Editor"
           cat << 'EOF' > release_notes.md
-          ### Notes Workstation — Reliable Device Pairing
+          ### Notes Workstation — Media Embedding & Enhanced Editor
 
           #### What's new in this release
 
-          - Pairing QR codes stay stable while displayed; phones only report success after the workstation confirms registration.
-          - Paired devices appear in the device list with live online status and retry saved Wi-Fi and Tailscale routes automatically.
-          - Android release builds can reach the workstation over local Wi-Fi, and Disconnect removes the phone from both devices.
-          - Workstation identity and phone identity persist across restarts, so pairing is a one-time step.
-          - Network discovery no longer advertises loopback addresses or guessed Tailscale DNS names.
-          - Remote API and WebSocket access require the private credential exchanged by the pairing QR code.
-          - Android 9+ release APKs use a protected signing key and a signed rotation lineage for existing installs.
-          - Tailscale is used only when already configured; the app no longer starts its client or opens authentication prompts on startup.
-          - Includes the existing silent desktop launcher, multi-platform installers, and Android package.
+          - **Enhanced Editor Navigation**: Smooth, deterministic arrow key movement without jumping or cursor offset glitches.
+          - **Numbered List Display**: Numeric list indices stay clearly visible and formatted when leaving lines.
+          - **Media Embedding (Images, Audio, Video)**: Add media easily via copy-paste, drag-and-drop, or the new toolbar file dialog, with inline playback.
+          - **Reliable Course Folders**: Seamlessly create and organize folders inside courses with automatic offline persistence and backend sync.
+          - **Tailscale & LAN Pairing**: Robust device discovery and pairing over local Wi-Fi and Tailscale networks with universal CORS support.
+          - **Multi-Platform Packages**: Official Windows Setup, portable Windows EXE, Linux AppImage/DEB, and universal signed Android APKs.
 
           #### Downloads
 

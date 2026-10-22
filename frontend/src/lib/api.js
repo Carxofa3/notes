@@ -108,10 +108,14 @@ export async function createLesson(name, icon = '📚', color = '#3b82f6') {
     const res = await safeFetch(`${base}/api/lessons/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name })
+      body: JSON.stringify({ name, icon, color })
     });
     if (res && res.ok) {
-      try { return await res.json(); } catch (_) {}
+      try {
+        const data = await res.json();
+        saveLocalLesson(name, icon, color);
+        return data;
+      } catch (_) {}
     }
   }
   return saveLocalLesson(name, icon, color);
@@ -132,16 +136,22 @@ export async function deleteLesson(lessonId) {
 // --- Units (Folders / Chapters) ---
 export async function fetchUnits(lessonId) {
   const base = getBase();
-  if (base !== null) {
-    const res = await safeFetch(`${base}/api/units/by-lesson/${lessonId}`);
+  const localUnits = getLocalUnits(lessonId);
+  const parsedLessonId = isNaN(Number(lessonId)) ? lessonId : parseInt(lessonId, 10);
+  if (base !== null && typeof parsedLessonId === 'number') {
+    const res = await safeFetch(`${base}/api/units/by-lesson/${parsedLessonId}`);
     if (res && res.ok) {
       try {
         const data = await res.json();
-        if (Array.isArray(data)) return data;
+        if (Array.isArray(data)) {
+          const serverIds = new Set(data.map(u => String(u.id)));
+          const unmerged = localUnits.filter(u => !serverIds.has(String(u.id)));
+          return [...data, ...unmerged];
+        }
       } catch (_) {}
     }
   }
-  return getLocalUnits(lessonId);
+  return localUnits;
 }
 
 export async function fetchAllUnits() {
@@ -150,17 +160,54 @@ export async function fetchAllUnits() {
 
 export async function createUnit(lessonId, name, icon = '📁', color = '#10b981') {
   const base = getBase();
-  if (base !== null) {
-    const res = await safeFetch(`${base}/api/units/by-lesson/${lessonId}`, {
+  const parsedLessonId = isNaN(Number(lessonId)) ? lessonId : parseInt(lessonId, 10);
+  if (base !== null && typeof parsedLessonId === 'number') {
+    const res = await safeFetch(`${base}/api/units/by-lesson/${parsedLessonId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, lesson_id: lessonId })
+      body: JSON.stringify({ name, lesson_id: parsedLessonId, icon, color })
     });
     if (res && res.ok) {
-      try { return await res.json(); } catch (_) {}
+      try {
+        const data = await res.json();
+        saveLocalUnit(lessonId, name, icon, color);
+        return data;
+      } catch (_) {}
     }
   }
   return saveLocalUnit(lessonId, name, icon, color);
+}
+
+// --- Media & Image Uploads (Images, Audio, Video) ---
+export async function uploadMediaFile(file, noteId = null) {
+  const base = getBase();
+  if (base !== null) {
+    const parsedNoteId = (noteId && !isNaN(Number(noteId))) ? parseInt(noteId, 10) : null;
+    const url = parsedNoteId ? `${base}/api/images/upload/${parsedNoteId}` : `${base}/api/images/upload`;
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await safeFetch(url, {
+        method: 'POST',
+        body: formData
+      }, 15000);
+      if (res && res.ok) {
+        const data = await res.json();
+        if (data && data.url) {
+          const finalUrl = (base && data.url.startsWith('/')) ? `${base}${data.url}` : data.url;
+          return { url: finalUrl, filename: data.filename || file.name };
+        }
+      }
+    } catch (_) {}
+  }
+
+  // Offline fallback: convert file to Base64 data URL
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve({ url: reader.result, filename: file.name, isDataUrl: true });
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
 }
 
 export async function updateUnit(unitId, data) {

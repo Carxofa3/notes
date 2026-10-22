@@ -261,6 +261,9 @@
       if (u) {
         expandedFolders[u.id] = true;
         activeUnit = u;
+        if (!units.some(existing => String(existing.id) === String(u.id))) {
+          units = [...units, u];
+        }
         await refreshTree();
       }
     }
@@ -555,7 +558,7 @@
       <button
         class="p-1.5 rounded-lg text-xs font-medium bg-[var(--card)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center justify-center shadow-xs"
         onclick={() => openSettings('appearance')}
-        title="Workstation Hub & Settings (Themes, Server, AI, Updates)"
+        title="Workstation Hub & Settings (Themes, Server, Compute, Updates)"
       >
         <span>⚙️</span>
       </button>

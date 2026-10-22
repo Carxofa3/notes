@@ -6,9 +6,10 @@
 
 ## Key Capabilities
 
-1. **Dual-Mode Editor (Visual Rich Text & Split Markdown)**
-   - **TipTap ProseMirror**: Seamless WYSIWYG note editing with inline code blocks, tables, callouts, and shortcuts.
+1. **Dual-Mode Editor (Live Markdown & Source Mode)**
+   - **CodeMirror 6 Live Markdown**: Seamless live preview note editing with inline code blocks, tables, math, media, and shortcuts.
    - **Split Markdown**: Raw markdown editing with instant KaTeX math typesetting and live preview.
+   - **Media Embedding**: Drag-and-drop, copy-paste, and file dialog for images, audio recordings, and videos with interactive inline playback.
    - **Quick Shortcuts**:
      - `Ctrl+K`: Omnibox Quick Search & Command Palette
      - `Ctrl+Shift+F`: Real-time Fact-Check trigger
@@ -30,7 +31,7 @@
    - **Tier 2 (Academic Online)**: Real-time verification against Wikipedia REST API and Semantic Scholar paper abstracts.
    - **Interactive Diff Corrections**: Visual 1-click side-by-side diff review allowing students to accept verified corrections into their notes.
 
-5. **Deep LLM Escalation (`llama.cpp`)**
+5. **Local Inference Escalation (`llama.cpp`)**
    - Contradiction resolution and study guide generation escalated to a high-capacity **`llama.cpp`** server (default `http://localhost:8080`, configurable via `LLAMA_CPP_NODE` over Tailscale).
    - Supports native `/completion` with custom prompt framing as well as `/v1/chat/completions`.
 

@@ -68,7 +68,8 @@ GEMINI.md
 # Node / Frontend
 node_modules/
 frontend/node_modules/
-app/static/uploads/slides/
+app/static/uploads/*
+!app/static/uploads/.gitkeep
 
 # Tauri / Rust
 src-tauri/target/

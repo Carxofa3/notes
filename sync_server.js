@@ -81,7 +81,13 @@ const wss = new WebSocketServer({
       && timingSafeEqual(suppliedToken, expectedToken);
     done(valid, valid ? 101 : 401, valid ? 'Paired device' : 'Pairing required');
   },
-  handleProtocols: (protocols) => protocols.has('notes') ? 'notes' : false
+  handleProtocols: (protocols) => {
+    if (protocols.has('notes')) return 'notes';
+    for (const p of protocols) {
+      if (p.startsWith('notes-auth.')) return p;
+    }
+    return false;
+  }
 });
 
 wss.on('connection', (ws, req) => {

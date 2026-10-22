@@ -11,6 +11,8 @@ class Lesson(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
     display_order = db.Column(db.Integer)
+    icon = db.Column(db.String(50), default='📚')
+    color = db.Column(db.String(20), default='#3b82f6')
     units = db.relationship('Unit', backref='lesson', lazy=True, cascade="all, delete-orphan")
 
 class Unit(db.Model):
@@ -19,6 +21,8 @@ class Unit(db.Model):
     name = db.Column(db.String(100), nullable=False)
     lesson_id = db.Column(db.Integer, db.ForeignKey('lesson.id'), nullable=False)
     display_order = db.Column(db.Integer)
+    icon = db.Column(db.String(50), default='📁')
+    color = db.Column(db.String(20), default='#10b981')
     notes = db.relationship('Note', backref='unit', lazy=True, cascade="all, delete-orphan")
 
 class Note(db.Model):

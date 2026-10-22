@@ -45,7 +45,7 @@ def is_loopback_request() -> bool:
 
 
 def is_trusted_local_origin(origin: str) -> bool:
-    if origin in ("http://tauri.localhost", "tauri://localhost"):
+    if origin in ("http://tauri.localhost", "https://tauri.localhost", "tauri://localhost"):
         return True
     try:
         parsed = urlsplit(origin)

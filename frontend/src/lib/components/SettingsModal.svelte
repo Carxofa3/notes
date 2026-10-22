@@ -208,7 +208,7 @@
           <span class="text-xl">⚙️</span>
           <div>
             <h2 class="text-sm font-bold text-[var(--text-primary)]">Workstation Hub & Settings</h2>
-            <p class="text-[11px] text-[var(--text-secondary)]">Preferences, mesh networking, AI models, and system updates</p>
+            <p class="text-[11px] text-[var(--text-secondary)]">Preferences, mesh networking, compute models, and system updates</p>
           </div>
         </div>
         <button 
@@ -241,8 +241,8 @@
           class="px-3 py-2 text-xs font-medium border-b-2 transition-all flex items-center gap-1.5 whitespace-nowrap {activeTab === 'compute' ? 'border-[var(--accent)] text-[var(--accent)] font-semibold' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}"
           onclick={() => { activeTab = 'compute'; loadComputeData(); }}
         >
-          <span>🧠</span>
-          <span>AI & Compute</span>
+          <span>⚡</span>
+          <span>Compute & Models</span>
         </button>
         <button
           type="button"
@@ -431,8 +431,8 @@
         {#if activeTab === 'compute'}
           <div class="flex flex-col gap-4">
             <div>
-              <h3 class="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider mb-1">AI Inference & Academic Verification</h3>
-              <p class="text-[11px] text-[var(--text-secondary)]">Neural fact-checking, lecture slide RAG, and local LLM acceleration.</p>
+              <h3 class="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider mb-1">Local Inference & Academic Verification</h3>
+              <p class="text-[11px] text-[var(--text-secondary)]">Automated fact-checking, lecture slide indexing, and model acceleration.</p>
             </div>
 
             <!-- GLiNER Model Card -->
