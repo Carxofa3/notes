@@ -155,7 +155,7 @@
 
   async function heartbeatPairedDevice() {
     const paired = getPairedConnection();
-    if (!paired?.activeUrl || !paired?.accessToken) {
+    if (!paired?.accessToken) {
       if (!paired) {
         hasPairedConnection = false;
         connectionState = 'offline';
@@ -163,13 +163,24 @@
       return;
     }
     hasPairedConnection = true;
-    try {
-      await registerPeer(peerIdentity());
-      connectionState = 'online';
-      const active = getPairedConnection()?.activeUrl || paired.activeUrl;
-      connectionRoute = active.includes('100.') || active.includes('.ts.net') ? 'Tailscale' : 'Wi-Fi';
-      currentServerUrl = active;
-    } catch (_) {
+    const candidateEndpoints = paired.endpoints && paired.endpoints.length > 0
+      ? [paired.activeUrl, ...paired.endpoints.filter(e => e && e !== paired.activeUrl)]
+      : [paired.activeUrl];
+
+    let connected = false;
+    for (const url of candidateEndpoints) {
+      if (!url) continue;
+      try {
+        await registerPeer(peerIdentity(), url, paired.accessToken);
+        setActivePairedEndpoint(url);
+        connectionState = 'online';
+        connectionRoute = url.includes('100.') || url.includes('.ts.net') ? 'Tailscale' : 'Wi-Fi';
+        currentServerUrl = url;
+        connected = true;
+        break;
+      } catch (_) {}
+    }
+    if (!connected) {
       connectionState = 'offline';
     }
   }
@@ -1034,11 +1045,18 @@
                   <span class="block mt-1 text-xs">{connectionState === 'online' ? `Using ${connectionRoute || 'the best available route'}` : 'Your pairing is saved. Notes is retrying Wi-Fi and Tailscale.'}</span>
                 </div>
                 <p class="text-xs text-[var(--text-secondary)]">You only need to scan once. If you want to connect to a different workstation, disconnect and scan its code.</p>
-                <button
-                  type="button"
-                  class="self-start px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-950/40 hover:bg-red-900/40 text-red-300 border border-red-500/40 cursor-pointer"
-                  onclick={handleDisconnect}
-                >Disconnect</button>
+                <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--card)] hover:bg-[var(--bg-tertiary)] text-[var(--accent)] border border-[var(--border)] cursor-pointer"
+                    onclick={heartbeatPairedDevice}
+                  >Retry Now</button>
+                  <button
+                    type="button"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-950/40 hover:bg-red-900/40 text-red-300 border border-red-500/40 cursor-pointer"
+                    onclick={handleDisconnect}
+                  >Disconnect</button>
+                </div>
                 {#if registerMessage}
                   <div class="p-2.5 rounded-lg border text-[11px] {registerMessage.startsWith('Paired with') ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300' : 'bg-red-950/30 border-red-500/40 text-red-300'}" role="status" aria-live="polite">{registerMessage}</div>
                 {/if}

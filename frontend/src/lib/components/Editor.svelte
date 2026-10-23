@@ -158,6 +158,162 @@
     e.target.value = '';
   }
 
+  function safeCursorLineUp(view) {
+    const { state } = view;
+    const sel = state.selection.main;
+    if (!sel.empty) {
+      view.dispatch({
+        selection: { anchor: sel.from },
+        scrollIntoView: true,
+        userEvent: 'select'
+      });
+      return true;
+    }
+
+    const moved = view.moveVertically(sel, false);
+    if (moved && moved.head !== sel.head && moved.head < sel.head) {
+      view.dispatch({
+        selection: moved,
+        scrollIntoView: true,
+        userEvent: 'select'
+      });
+      return true;
+    }
+
+    const curLine = state.doc.lineAt(sel.head);
+    if (curLine.number > 1) {
+      const prevLine = state.doc.line(curLine.number - 1);
+      const col = sel.head - curLine.from;
+      const targetHead = Math.min(prevLine.from + col, prevLine.to);
+      view.dispatch({
+        selection: { anchor: targetHead },
+        scrollIntoView: true,
+        userEvent: 'select'
+      });
+      return true;
+    } else if (sel.head > 0) {
+      view.dispatch({
+        selection: { anchor: 0 },
+        scrollIntoView: true,
+        userEvent: 'select'
+      });
+      return true;
+    }
+    return false;
+  }
+
+  function safeCursorLineDown(view) {
+    const { state } = view;
+    const sel = state.selection.main;
+    if (!sel.empty) {
+      view.dispatch({
+        selection: { anchor: sel.to },
+        scrollIntoView: true,
+        userEvent: 'select'
+      });
+      return true;
+    }
+
+    const moved = view.moveVertically(sel, true);
+    if (moved && moved.head !== sel.head && moved.head > sel.head) {
+      view.dispatch({
+        selection: moved,
+        scrollIntoView: true,
+        userEvent: 'select'
+      });
+      return true;
+    }
+
+    const curLine = state.doc.lineAt(sel.head);
+    if (curLine.number < state.doc.lines) {
+      const nextLine = state.doc.line(curLine.number + 1);
+      const col = sel.head - curLine.from;
+      const targetHead = Math.min(nextLine.from + col, nextLine.to);
+      view.dispatch({
+        selection: { anchor: targetHead },
+        scrollIntoView: true,
+        userEvent: 'select'
+      });
+      return true;
+    } else if (sel.head < state.doc.length) {
+      view.dispatch({
+        selection: { anchor: state.doc.length },
+        scrollIntoView: true,
+        userEvent: 'select'
+      });
+      return true;
+    }
+    return false;
+  }
+
+  function safeSelectLineUp(view) {
+    const { state } = view;
+    const sel = state.selection.main;
+    const moved = view.moveVertically(sel, false);
+    if (moved && moved.head !== sel.head && moved.head < sel.head) {
+      view.dispatch({
+        selection: { anchor: sel.anchor, head: moved.head },
+        scrollIntoView: true,
+        userEvent: 'select'
+      });
+      return true;
+    }
+    const curLine = state.doc.lineAt(sel.head);
+    if (curLine.number > 1) {
+      const prevLine = state.doc.line(curLine.number - 1);
+      const col = sel.head - curLine.from;
+      const targetHead = Math.min(prevLine.from + col, prevLine.to);
+      view.dispatch({
+        selection: { anchor: sel.anchor, head: targetHead },
+        scrollIntoView: true,
+        userEvent: 'select'
+      });
+      return true;
+    } else if (sel.head > 0) {
+      view.dispatch({
+        selection: { anchor: sel.anchor, head: 0 },
+        scrollIntoView: true,
+        userEvent: 'select'
+      });
+      return true;
+    }
+    return false;
+  }
+
+  function safeSelectLineDown(view) {
+    const { state } = view;
+    const sel = state.selection.main;
+    const moved = view.moveVertically(sel, true);
+    if (moved && moved.head !== sel.head && moved.head > sel.head) {
+      view.dispatch({
+        selection: { anchor: sel.anchor, head: moved.head },
+        scrollIntoView: true,
+        userEvent: 'select'
+      });
+      return true;
+    }
+    const curLine = state.doc.lineAt(sel.head);
+    if (curLine.number < state.doc.lines) {
+      const nextLine = state.doc.line(curLine.number + 1);
+      const col = sel.head - curLine.from;
+      const targetHead = Math.min(nextLine.from + col, nextLine.to);
+      view.dispatch({
+        selection: { anchor: sel.anchor, head: targetHead },
+        scrollIntoView: true,
+        userEvent: 'select'
+      });
+      return true;
+    } else if (sel.head < state.doc.length) {
+      view.dispatch({
+        selection: { anchor: sel.anchor, head: state.doc.length },
+        scrollIntoView: true,
+        userEvent: 'select'
+      });
+      return true;
+    }
+    return false;
+  }
+
   function initCodeMirror() {
     if (!editorContainer || editorView) return;
 
@@ -213,14 +369,20 @@
         marginRight: '0.25rem !important',
         transition: 'none !important'
       },
-      // Remove all CSS transitions so arrow keys move smoothly without DOM jitter
-      '.cm-formatting-block, .cm-formatting-inline': {
+      // Remove all CSS transitions and transform scaleX to preserve exact cursor measurements
+      '.cm-formatting-inline, .cm-formatting-inline-visible': {
+        transform: 'none !important',
         transition: 'none !important'
       },
-      '.cm-formatting-block-visible, .cm-formatting-inline-visible': {
+      '.cm-formatting-block, .cm-formatting-block-visible': {
         transition: 'none !important'
       }
     });
+
+    const navigationKeymap = [
+      { key: 'ArrowUp', run: safeCursorLineUp, shift: safeSelectLineUp, preventDefault: true },
+      { key: 'ArrowDown', run: safeCursorLineDown, shift: safeSelectLineDown, preventDefault: true }
+    ];
 
     const startState = EditorState.create({
       doc: content,
@@ -229,7 +391,7 @@
         highlightActiveLine(),
         EditorView.lineWrapping,
         placeholder('Start typing your lecture note... (Markdown, $inline math$, $$block math$$, tables, code blocks)'),
-        keymap.of([...defaultKeymap, ...historyKeymap]),
+        keymap.of([...navigationKeymap, ...defaultKeymap, ...historyKeymap]),
         markdown({ extensions: [Table] }),
         livePreviewCompartment.of(collapseOnSelectionFacet.of(isLivePreview)),
         mouseSelectingField,
