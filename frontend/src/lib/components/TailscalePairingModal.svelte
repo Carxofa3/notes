@@ -52,6 +52,7 @@
   let scannerError = $state('');
   let scannerInstance = null;
   let currentServerUrl = $state('');
+  let isQrEnlarged = $state(false);
 
   // Cluster & Nodes State
   let clusterData = $state(null);
@@ -221,34 +222,39 @@
     isGeneratingQr = true;
     try {
       let payloadToEncode = '';
-      if (pairInfo && pairInfo.pairing_payload) {
-        const { ts: _volatileTimestamp, ...stablePayload } = pairInfo.pairing_payload;
-        payloadToEncode = JSON.stringify(stablePayload);
-      } else if (pairInfo && (pairInfo.lan_url || pairInfo.lan_ip || pairInfo.tailscale_url)) {
+      if (pairInfo) {
+        const p = pairInfo.pairing_payload || pairInfo;
         const port = pairInfo.http_port || 58850;
-        payloadToEncode = JSON.stringify({
-          type: 'NOTES_PAIR',
-          v: 2,
-          name: pairInfo.device_name || 'Desktop Workstation',
-          lan_url: pairInfo.lan_url || (pairInfo.lan_ip ? `http://${pairInfo.lan_ip}:${port}` : null),
-          tailscale_url: pairInfo.tailscale_url || (pairInfo.tailscale_ip ? `http://${pairInfo.tailscale_ip}:${port}` : null),
-          lan_ip: pairInfo.lan_ip || null,
-          tailscale_ip: pairInfo.tailscale_ip || null,
-          http_port: port,
-          fingerprint: pairInfo.fingerprint || 'local'
-        });
-      } else {
+        const lanUrl = p.lan_url || (pairInfo.lan_ip ? `http://${pairInfo.lan_ip}:${port}` : null);
+        const tsUrl = p.tailscale_url || (pairInfo.tailscale_ip ? `http://${pairInfo.tailscale_ip}:${port}` : null);
+        const token = p.access_token || '';
+
+        // Drop redundant fields (fingerprint, hardware, ports, name, type) so the QR code
+        // is minimal, clean, and has low data density for instant camera recognition.
+        // The mobile client gathers all device details automatically upon connecting.
+        const minimal = {};
+        if (lanUrl) minimal.lan_url = lanUrl;
+        if (tsUrl) minimal.tailscale_url = tsUrl;
+        if (token) minimal.access_token = token;
+
+        if (token && (lanUrl || tsUrl)) {
+          payloadToEncode = JSON.stringify(minimal);
+        }
+      }
+
+      if (!payloadToEncode) {
         qrDataUrl = '';
         qrPayloadKey = '';
         return;
       }
 
-      if (!payloadToEncode || payloadToEncode === qrPayloadKey && qrDataUrl) return;
+      if (payloadToEncode === qrPayloadKey && qrDataUrl) return;
       qrPayloadKey = payloadToEncode;
 
       const url = await QRCode.toDataURL(payloadToEncode, {
-        width: 240,
+        width: 360,
         margin: 2,
+        errorCorrectionLevel: 'M',
         color: {
           dark: '#0f172a',
           light: '#ffffff'
@@ -415,9 +421,19 @@
 
 
   async function handleCopyPayload() {
-    const payload = pairInfo?.pairing_payload
-      ? JSON.stringify(pairInfo.pairing_payload, null, 2)
-      : '';
+    let payload = '';
+    if (pairInfo) {
+      const p = pairInfo.pairing_payload || pairInfo;
+      const port = pairInfo.http_port || 58850;
+      const minimal = {};
+      const lanUrl = p.lan_url || (pairInfo.lan_ip ? `http://${pairInfo.lan_ip}:${port}` : null);
+      const tsUrl = p.tailscale_url || (pairInfo.tailscale_ip ? `http://${pairInfo.tailscale_ip}:${port}` : null);
+      const token = p.access_token || '';
+      if (lanUrl) minimal.lan_url = lanUrl;
+      if (tsUrl) minimal.tailscale_url = tsUrl;
+      if (token) minimal.access_token = token;
+      payload = JSON.stringify(minimal, null, 2);
+    }
     if (!payload) return;
     try {
       await navigator.clipboard.writeText(payload);
@@ -449,7 +465,7 @@
     setTimeout(() => { if (registerMessage.includes('Disconnected')) registerMessage = ''; }, 3500);
   }
 
-  async function finishPairing(payload, winner, accessToken) {
+  async function finishPairing(payload, winner, accessToken, probeData = null) {
     const identity = peerIdentity();
     const registration = await registerPeer(identity, winner.url, accessToken);
     if (registration.fingerprint && registration.fingerprint !== identity.fingerprint) {
@@ -461,7 +477,16 @@
       throw new Error('The workstation did not list this device after pairing. Try scanning again.');
     }
 
-    setPairedConnection(payload, winner.url);
+    // Populate full workstation details gathered from probe response and registration
+    const fullPayload = {
+      ...payload,
+      name: probeData?.device_name || probeData?.name || registration?.device_name || payload?.name || 'Notes Workstation',
+      lan_url: probeData?.pairing_payload?.lan_url || probeData?.lan_url || payload?.lan_url,
+      tailscale_url: probeData?.pairing_payload?.tailscale_url || probeData?.tailscale_url || payload?.tailscale_url,
+      fingerprint: probeData?.fingerprint || registration?.fingerprint || payload?.fingerprint
+    };
+
+    setPairedConnection(fullPayload, winner.url);
     hasPairedConnection = true;
     currentServerUrl = winner.url;
     connectionState = 'online';
@@ -498,6 +523,9 @@
         throw new Error('This code is not a Notes Workstation pairing code.');
       }
       if (!payload.access_token) {
+        payload.access_token = payload.token || payload.t;
+      }
+      if (!payload.access_token) {
         throw new Error('This pairing code has no device credential. Reopen the QR in Notes Workstation and scan it again.');
       }
 
@@ -513,14 +541,15 @@
           if (!candidates.some(candidate => candidate.url === url)) candidates.push({ name, url });
         } catch (_) {}
       };
-      addCandidate('Wi-Fi', payload.lan_url);
-      addCandidate('Tailscale', payload.tailscale_url);
+      addCandidate('Wi-Fi', payload.lan_url || payload.lan);
+      addCandidate('Tailscale', payload.tailscale_url || payload.ts);
       addCandidate('Wi-Fi', payload.lan_ip ? `http://${payload.lan_ip}:${port}` : null);
       addCandidate('Tailscale', (payload.tailscale_ip || payload.ip) ? `http://${payload.tailscale_ip || payload.ip}:${port}` : null);
       addCandidate('Tailscale', payload.magic_dns ? `http://${payload.magic_dns}:${port}` : null);
       if (candidates.length === 0) throw new Error('This QR code has no usable network addresses.');
 
       let winner = null;
+      let winnerProbeData = null;
 
       for (const cand of candidates) {
         registerMessage = `Finding ${hostName} over ${cand.name}…`;
@@ -530,14 +559,15 @@
             throw new Error('The QR code belongs to a different workstation. Scan its current QR code.');
           }
           winner = cand;
+          winnerProbeData = probe.data;
           break;
         }
       }
 
       if (!winner) throw new Error(`Could not reach ${hostName}. Check that both devices are on Wi-Fi or Tailscale, then scan again.`);
 
-      await finishPairing(payload, winner, payload.access_token);
-      registerMessage = `Paired with ${hostName}. Connected over ${winner.name}; it will switch routes automatically when networks change.`;
+      await finishPairing(payload, winner, payload.access_token, winnerProbeData);
+      registerMessage = `Paired with ${winnerProbeData?.device_name || hostName}. Connected over ${winner.name}; it will switch routes automatically when networks change.`;
       inputToken = '';
     } catch (err) {
       registerMessage = err instanceof SyntaxError
@@ -569,7 +599,14 @@
 
     try {
       scannerInstance = new Html5Qrcode('qr-reader');
-      const config = { fps: 10, qrbox: { width: 220, height: 220 } };
+      const config = {
+        fps: 10,
+        qrbox: (viewfinderWidth, viewfinderHeight) => {
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          const boxSize = Math.max(220, Math.floor(minEdge * 0.85));
+          return { width: boxSize, height: boxSize };
+        }
+      };
 
       await scannerInstance.start(
         { facingMode: 'environment' },
@@ -956,20 +993,30 @@
                 Pair this device
               </span>
               <span class="text-[11px] text-[var(--text-secondary)]">
-                Scan once from Notes on your phone. This code stays stable.
+                Scan once from Notes on your phone. Minimal & high-contrast.
               </span>
             </div>
             
             <div class="bg-white rounded-2xl p-3 flex flex-col items-center justify-center shadow-md border border-slate-200">
               {#if qrDataUrl}
-                <img src={qrDataUrl} alt="Universal Pairing QR Code" class="w-48 h-48 rounded-lg object-contain" />
+                <button
+                  type="button"
+                  class="cursor-pointer group flex flex-col items-center"
+                  onclick={() => isQrEnlarged = true}
+                  title="Click to enlarge QR code"
+                >
+                  <img src={qrDataUrl} alt="Universal Pairing QR Code" class="w-60 h-60 sm:w-68 sm:h-68 rounded-lg object-contain transition-transform group-hover:scale-[1.02]" />
+                  <span class="mt-1.5 text-[11px] text-slate-500 font-medium group-hover:text-slate-900 flex items-center gap-1">
+                    🔍 Click to enlarge
+                  </span>
+                </button>
               {:else if isGeneratingQr}
-                <div class="w-48 h-48 flex flex-col items-center justify-center text-slate-400 gap-2">
+                <div class="w-60 h-60 sm:w-68 sm:h-68 flex flex-col items-center justify-center text-slate-400 gap-2">
                   <span class="text-2xl animate-spin">⏳</span>
                   <span class="text-xs font-medium">Generating QR...</span>
                 </div>
               {:else}
-                <div class="w-48 h-48 flex flex-col items-center justify-center text-slate-400 gap-2 text-center p-2">
+                <div class="w-60 h-60 sm:w-68 sm:h-68 flex flex-col items-center justify-center text-slate-400 gap-2 text-center p-2">
                   <span class="text-3xl">{hasPairedConnection ? '✓' : '📱'}</span>
                   <span class="text-xs font-semibold text-slate-700">{hasPairedConnection ? 'Already paired' : 'Waiting for workstation'}</span>
                   <span class="text-[10px] text-slate-500 leading-tight">{hasPairedConnection ? 'This device keeps its pairing. No repeat scan needed.' : 'Open this screen on your workstation to show its pairing code.'}</span>
@@ -1153,6 +1200,57 @@
           Done
         </button>
       </div>
+    </div>
+  </div>
+{/if}
+
+{#if isQrEnlarged && qrDataUrl}
+  <div 
+    class="fixed inset-0 z-60 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-150"
+    onclick={() => isQrEnlarged = false}
+  >
+    <div 
+      class="bg-white rounded-3xl p-6 sm:p-8 flex flex-col items-center justify-center gap-4 shadow-2xl max-w-sm sm:max-w-md w-full border border-slate-200"
+      onclick={(e) => e.stopPropagation()}
+    >
+      <div class="w-full flex items-center justify-between">
+        <div class="flex flex-col">
+          <span class="text-base font-bold text-slate-900">Pair this device</span>
+          <span class="text-xs text-slate-500">Scan with Notes on your phone</span>
+        </div>
+        <button 
+          type="button" 
+          class="text-slate-400 hover:text-slate-700 text-2xl font-bold p-1 cursor-pointer leading-none"
+          onclick={() => isQrEnlarged = false}
+        >&times;</button>
+      </div>
+
+      <div class="p-3 bg-white rounded-2xl border border-slate-200 shadow-inner flex items-center justify-center">
+        <img src={qrDataUrl} alt="Enlarged Pairing QR Code" class="w-72 h-72 sm:w-80 sm:h-80 object-contain" />
+      </div>
+
+      <div class="w-full flex flex-col gap-1 text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200 font-mono">
+        {#if localWifiUrl}
+          <div class="flex items-center justify-between">
+            <span class="text-slate-500 font-sans font-medium">Wi-Fi:</span>
+            <span class="truncate">{localWifiUrl}</span>
+          </div>
+        {/if}
+        {#if tailscaleUrl}
+          <div class="flex items-center justify-between">
+            <span class="text-indigo-600 font-sans font-medium">Tailscale:</span>
+            <span class="truncate text-indigo-700">{tailscaleUrl}</span>
+          </div>
+        {/if}
+      </div>
+
+      <button
+        type="button"
+        class="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer transition-colors"
+        onclick={() => isQrEnlarged = false}
+      >
+        Close
+      </button>
     </div>
   </div>
 {/if}
